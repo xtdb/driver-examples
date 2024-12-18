@@ -1,0 +1,29 @@
+{
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg"
+      ],
+      "settings": {
+        "sqltools.connections": [
+          {
+            "previewLimit": 50,
+            "server": "xtdb",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "XTDB",
+            "database": "xtdb",
+            "username": "xtdb",
+            "password": "xtdb"
+          }
+        ],
+        "sqltools.results.reuseTabs": "connection"
+      }
+    }
+  }
+}

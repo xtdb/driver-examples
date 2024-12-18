@@ -1,0 +1,19 @@
+# Dockerfile
+FROM mcr.microsoft.com/devcontainers/universal:2
+
+# Install prerequisites
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    openjdk-11-jdk \
+    rlwrap \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Clojure CLI using the official script
+RUN curl -L -O https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh && \
+    chmod +x linux-install.sh && \
+    ./linux-install.sh && \
+    rm linux-install.sh
+
+# Set the working directory
+WORKDIR /workspaces
