@@ -1,4 +1,5 @@
 {
+  "name": "XTDB Driver Examples",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspaces",
