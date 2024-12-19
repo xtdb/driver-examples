@@ -12,6 +12,7 @@ services:
 
     volumes:
       - ..:/workspaces:cached
+      - xtdb-logs:/workspaces/logs
 
     # Overrides default command so things don't shut down after the process ends.
     command: sleep infinity
@@ -25,10 +26,16 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+    environment:
+      JDK_JAVA_OPTIONS: "-Dlogback.configurationFile=/config/logback.xml"
+      XTDB_LOGGING_LEVEL_PGWIRE: debug
     volumes:
       - xtdb-data:/var/lib/xtdb
       - ./xtdb.yaml:/config/xtdb.yaml
+      - ./logback.xml:/config/logback.xml
+      - xtdb-logs:/workspaces/logs
     command: ["-f", "/config/xtdb.yaml"]
 
 volumes:
   xtdb-data:
+  xtdb-logs:
