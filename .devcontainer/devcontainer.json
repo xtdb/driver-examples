@@ -7,7 +7,8 @@
     "vscode": {
       "extensions": [
         "mtxr.sqltools",
-        "mtxr.sqltools-driver-pg"
+        "mtxr.sqltools-driver-pg",
+	"betterthantomorrow.calva"
       ],
       "settings": {
         "sqltools.connections": [
@@ -23,7 +24,22 @@
           }
         ],
         "sqltools.results.reuseTabs": "connection"
-      }
+      },
+      "calva.replConnectSequences": [
+          {
+            "name": "XTDB Clojure Driver Example",
+            "projectType": "deps.edn",
+            "cljsType": "none",
+            "nReplPortFile": [
+              ".nrepl-port"
+            ],
+            "menuSelections": {
+              "cljAliases": [
+                "dev"
+              ]
+            }
+          }
+        ]
     }
   }
 }
