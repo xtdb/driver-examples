@@ -44,23 +44,4 @@ When finished, you can shut down the containers using: `docker compose down`
 
 ### Use `asdf` to manage additional installations
 
-Run `sudo su`
-
-The `asdf` command should now be available to install new things.
-
-e.g. Erlang/Elixir
-```bash
-asdf plugin-add erlang
-asdf plugin-add elixir
-
-# optional build deps
-# apt-get install build-essential autoconf m4 libncurses5-dev libwxgtk3.0-dev libgl1-mesa-dev libglu1-mesa-dev libpng-dev libssh-dev unixodbc-dev xsltproc fop
-
-asdf install erlang 25.2.3
-asdf install elixir 1.14.3-otp-25
-
-asdf global erlang 25.2.3
-asdf global elixir 1.14.3-otp-25
-
-elixir -v
-```
+Run `sudo su` - the `asdf` command should now be available to install new things. Alternatively, use `sudo /root/.asdf/bin/asdf ...`
