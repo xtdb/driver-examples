@@ -1,0 +1,12 @@
+{
+  "name": "node-xtdb-example",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "postgres": "^3.4.5"
+  }
+}
