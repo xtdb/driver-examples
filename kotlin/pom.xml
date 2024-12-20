@@ -1,0 +1,85 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>kotlin-xtdb-example</artifactId>
+  <version>1.0-SNAPSHOT</version>
+
+  <properties>
+    <kotlin.version>1.9.10</kotlin.version>
+    <jvm.target>17</jvm.target>
+    <XTDB_VERSION>2.0.0-SNAPSHOT</XTDB_VERSION> <!-- Adjust as needed -->
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>sonatype-snapshots</id>
+      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+    </repository>
+    <repository>
+      <id>central</id>
+      <url>https://repo.maven.apache.org/maven2</url>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <!-- Kotlin Standard Library -->
+    <dependency>
+      <groupId>org.jetbrains.kotlin</groupId>
+      <artifactId>kotlin-stdlib</artifactId>
+      <version>${kotlin.version}</version>
+    </dependency>
+
+    <!-- XTDB JDBC Driver -->
+    <dependency>
+      <groupId>com.xtdb</groupId>
+      <artifactId>xtdb-jdbc</artifactId>
+      <version>${XTDB_VERSION}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Kotlin Maven Plugin -->
+      <plugin>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-maven-plugin</artifactId>
+        <version>${kotlin.version}</version>
+        <executions>
+          <execution>
+            <id>compile</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>test-compile</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>test-compile</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <sourceDirs>
+            <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
+          </sourceDirs>
+          <jvmTarget>${jvm.target}</jvmTarget>
+        </configuration>
+      </plugin>
+
+      <!-- Maven Exec Plugin -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.1.0</version>
+        <configuration>
+          <mainClass>MainKt</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

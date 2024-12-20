@@ -5,3 +5,4 @@ clojure/.lsp/
 /node/package-lock.json
 /node/node_modules/
 java/target/
+/kotlin/target/
