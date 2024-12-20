@@ -1,1 +1,1 @@
-mvn clean compile && mvn exec:java -Dexec.mainClass="XtdbHelloWorld"
+mvn -q clean compile && mvn exec:java -Dexec.mainClass="XtdbHelloWorld"
