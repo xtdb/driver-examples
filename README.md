@@ -30,3 +30,14 @@ Debug logs for the XTDB container can be found under `logs/xtdb.log`.
 
 For any assistance or questions, please [open an issue](https://github.com/xtdb/driver-examples) or post on [the forums](https://discuss.xtdb.com/). PRs are welcome too!
 
+## Developing locally
+
+Clone the the repo, then:
+
+`docker compose build`
+`docker compose up -d`
+`docker exec -it --user codespace app /bin/bash`
+(...)
+`docker compose down`
+
+Note that you will likely still need an internet connection after the containers have started to download dependencies.
