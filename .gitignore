@@ -4,3 +4,4 @@ clojure/.lsp/
 /ruby/Gemfile.lock
 /node/package-lock.json
 /node/node_modules/
+java/target/
