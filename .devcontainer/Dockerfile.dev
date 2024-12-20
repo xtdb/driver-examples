@@ -16,10 +16,13 @@ RUN curl -L -O https://github.com/clojure/brew-install/releases/latest/download/
     ./linux-install.sh && \
     rm linux-install.sh
 
-ENV ASDF_DIR=/root/.asdf
-ENV PATH="$ASDF_DIR/bin:$ASDF_DIR/shims:$PATH"
-RUN git clone https://github.com/asdf-vm/asdf.git $ASDF_DIR --branch v0.15.0
-RUN . "$ASDF_DIR/asdf.sh"
+RUN \
+    # configure git to get rid of detached head warnings
+    git config --global advice.detachedHead false; \
+    git clone https://github.com/asdf-vm/asdf.git $HOME/.asdf --branch v0.15.0; \
+    /bin/bash -c 'echo -e "\n\n## Configure ASDF \n. $HOME/.asdf/asdf.sh" >> ~/.bashrc'; \
+    /bin/bash -c 'echo -e "\n\n## ASDF Bash Completion: \n. $HOME/.asdf/completions/asdf.bash" >> ~/.bashrc'; \
+    exec bash;
 
 # Set the working directory
 WORKDIR /workspaces

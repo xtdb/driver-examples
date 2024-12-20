@@ -30,14 +30,37 @@ Debug logs for the XTDB container can be found under `logs/xtdb.log`.
 
 For any assistance or questions, please [open an issue](https://github.com/xtdb/driver-examples) or post on [the forums](https://discuss.xtdb.com/). PRs are welcome too!
 
-## Developing locally
+### Running locally (and testing changes)
 
-Clone the the repo, then:
+With Docker Compose installed, clone [this repo](https://github.com/xtdb/driver-examples) then run:
 
 `docker compose build`
 `docker compose up -d`
 `docker exec -it --user codespace app /bin/bash`
-(...)
-`docker compose down`
 
 Note that you will likely still need an internet connection after the containers have started to download dependencies.
+
+When finished, you can shut down the containers using: `docker compose down`
+
+### Use `asdf` to manage additional installations
+
+Run `sudo su`
+
+The `asdf` command should now be available to install new things.
+
+e.g. Erlang/Elixir
+```bash
+asdf plugin-add erlang
+asdf plugin-add elixir
+
+# optional build deps
+# apt-get install build-essential autoconf m4 libncurses5-dev libwxgtk3.0-dev libgl1-mesa-dev libglu1-mesa-dev libpng-dev libssh-dev unixodbc-dev xsltproc fop
+
+asdf install erlang 25.2.3
+asdf install elixir 1.14.3-otp-25
+
+asdf global erlang 25.2.3
+asdf global elixir 1.14.3-otp-25
+
+elixir -v
+```
