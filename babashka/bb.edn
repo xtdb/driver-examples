@@ -1,0 +1,2 @@
+{:paths ["bb"]
+ :pods {org.babashka/postgresql {:version "0.1.0"}}}
