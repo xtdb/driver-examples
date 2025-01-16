@@ -17,7 +17,7 @@ RUN curl -L -O https://github.com/clojure/brew-install/releases/latest/download/
     rm linux-install.sh
 
 # Install babashka using the official script
-RUN bash < <(curl -s https://raw.githubusercontent.com/babashka/babashka/master/install)
+# RUN bash < <(curl -s https://raw.githubusercontent.com/babashka/babashka/master/install)
 
 RUN \
     # configure git to get rid of detached head warnings
