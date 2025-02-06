@@ -6,13 +6,19 @@
   (jdbc/execute! conn
                  ["INSERT INTO users RECORDS {_id: 'jms', first_name: 'James'}"]
                  {:builder-fn xt-jdbc/builder-fn})
+
   (jdbc/execute! conn
                  ["INSERT INTO users RECORDS ?"
                   (xt-jdbc/->pg-obj {:xt/id "joe", :first-name "Joe", :a-map {:keys #{"nested" :edn 1 1.23}}})]
                  {:builder-fn xt-jdbc/builder-fn})
 
+  (jdbc/execute! conn
+                 ["PATCH INTO users RECORDS ?"
+                  (xt-jdbc/->pg-obj {:xt/id "joe", :likes "chocolate"})]
+                 {:builder-fn xt-jdbc/builder-fn})
+
   (prn (jdbc/execute! conn ["SELECT * FROM users"] {:builder-fn xt-jdbc/builder-fn}))
 
-  ;; => [{:xt/id "joe", :a-map {:keys #{1 :edn 1.23 "nested"}}, :first-name "Joe"}
+  ;; => [{:xt/id "joe", :a-map {:keys #{1 :edn 1.23 "nested"}}, :first-name "Joe", :likes "chocolate"}
   ;;     {:xt/id "jms", :a-map nil, :first-name "James"}]
   )

@@ -7,3 +7,9 @@ A [Dev Container](https://containers.dev) that you can use to try [XTDB](https:/
 Once the Codespace loads, you can start running SQL queries against XTDB!
 
 Use the VSCode 'SQL Tools' extension (connecting to the pre-installed XTDB connection).
+
+## Useful commands for running locally
+
+`docker-compose up -d --build xtdb app`
+`docker-compose logs --follow xtdb`
+`docker exec -it --user codespace app /bin/bash`

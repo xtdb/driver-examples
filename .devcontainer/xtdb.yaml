@@ -1,4 +1,4 @@
-txLog: !Local
+log: !Local
   path: "/var/lib/xtdb/log"
 
 storage: !Local
@@ -10,3 +10,6 @@ healthz:
 modules:
 - !HttpServer
   port: 3000
+
+server:
+  port: 5432
