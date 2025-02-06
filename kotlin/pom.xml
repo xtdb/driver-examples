@@ -7,7 +7,7 @@
   <version>1.0-SNAPSHOT</version>
 
   <properties>
-    <kotlin.version>1.9.10</kotlin.version>
+    <kotlin.version>2.1.0</kotlin.version>
     <jvm.target>17</jvm.target>
     <XTDB_VERSION>2.0.0-SNAPSHOT</XTDB_VERSION> <!-- Adjust as needed -->
   </properties>
