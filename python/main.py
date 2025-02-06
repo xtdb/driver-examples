@@ -1,5 +1,6 @@
 import asyncio
 import psycopg as pg
+from psycopg.types.json import Json
 
 DB_PARAMS = {
     "host": "xtdb",
@@ -9,12 +10,12 @@ DB_PARAMS = {
 
 async def insert_trades(conn, trades):
     query = r"""
-    INSERT INTO trades (_id, name, quantity) VALUES (%s, %s, %s)
+    INSERT INTO trades (_id, name, quantity, info) VALUES (%s, %s, %s, %s)
     """.strip()
 
     async with conn.cursor() as cur:
         for trade in trades:
-            trade_values = (trade["_id"], trade["name"], trade["quantity"])
+            trade_values = (trade["_id"], trade["name"], trade["quantity"], Json(trade["info"]))
             await cur.execute(query, trade_values)
 
 async def get_trades_over(conn, quantity):
@@ -27,9 +28,11 @@ async def get_trades_over(conn, quantity):
 
 async def main():
     trades = [
-        {"_id": 1, "name": "Trade1", "quantity": 1001},
-        {"_id": 2, "name": "Trade2", "quantity": 15},
-        {"_id": 3, "name": "Trade3", "quantity": 200},
+        {"_id": 1, "name": "Trade1", "quantity": 1001, "info": {"some_nested":
+                                                                ["json", 42,
+                                                                 {"data": ["hello"]}]}},
+        {"_id": 2, "name": "Trade2", "quantity": 15, "info": 2},
+        {"_id": 3, "name": "Trade3", "quantity": 200, "info": 3},
     ]
 
     try:
