@@ -8,6 +8,8 @@ To very simply get started, without any local installation, create your own GitH
 
 Once the Codespace loads (note: this can take several minutes), you can start running SQL queries against XTDB!
 
+If you would like to run the Dev Container setup fully locally (offline, and without a GitHub account) you can use VS Code or docker-compose directly - see the instructions within `.devcontainer/README.md` for guidance.
+
 ## Running your first queries
 
 The VSCode 'SQL Tools' extension is pre-configured to connects to the running XTDB Docker container. You can use this extension to explore the database and run queries.
