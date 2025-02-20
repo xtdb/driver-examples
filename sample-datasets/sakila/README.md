@@ -1,6 +1,6 @@
 # Sakila - a movie rental database
 
-If Clojure is installed then `cd clojure; clojure -M -m load-data` should be enough to load this [Sakila](https://www.jooq.org/sakila) dataset into XTDB.
+If Clojure is installed then `./load.sh` should be enough to load this [Sakila](https://www.jooq.org/sakila) dataset into XTDB.
 
 See the GitHub action workflow for exact usage.
 
