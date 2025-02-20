@@ -21,4 +21,8 @@
 
   ;; => [{:xt/id "joe", :a-map {:keys #{1 :edn 1.23 "nested"}}, :first-name "Joe", :likes "chocolate"}
   ;;     {:xt/id "jms", :a-map nil, :first-name "James"}]
+
+
+  (tap> (jdbc/execute! conn ["select * from inventory"]
+          {:schema-opts {:pk "_id"}})) ;; infer all FKs for datafy/nav usage
   )

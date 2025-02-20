@@ -1,0 +1,51 @@
+name: Verify XTDB Sample Data
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      xtdb:
+        image: ghcr.io/xtdb/xtdb:edge
+        ports:
+          - 5432:5432
+          - 8080:8080
+        options: >-
+          --health-cmd "curl --silent --fail http://localhost:8080/healthz/alive || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Clojure CLI
+        uses: DeLaGuardo/setup-clojure@11.0
+        with:
+          cli: latest
+
+      - name: Add XTDB Hostname to /etc/hosts
+        run: echo "127.0.0.1 xtdb" | sudo tee -a /etc/hosts
+
+      - name: Wait for XTDB to be Ready
+        run: |
+          for i in {1..60}; do
+            if curl --silent --fail http://localhost:8080/healthz/alive; then
+              echo "XTDB is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "XTDB did not start in time" && exit 1
+
+      - name: Run Data Load Script
+        run: cd clojure; clojure -M -m load-data ../sample-datasets/sakila/tsv
+
+      - name: Verify Inserted Data
+        run: cd clojure; clojure -M -m verify-data
