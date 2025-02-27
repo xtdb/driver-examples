@@ -33,6 +33,8 @@ services:
       - ./logback.xml:/config/logback.xml
       - xtdb-logs:/workspaces/logs
     command: ["-f", "/config/xtdb.yaml"]
+    ports:
+      - "5432:5432"  # Expose XTDB on the host
 
 volumes:
   xtdb-data:
