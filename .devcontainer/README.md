@@ -27,4 +27,7 @@ docker exec -it --user codespace app /bin/bash
 
 # shutdown
 docker-compose down
+
+# copy the database into a zip on the host
+sudo zip -r xtdb-data.zip /var/lib/docker/volumes/devcontainer_xtdb-data/_data
 ```
