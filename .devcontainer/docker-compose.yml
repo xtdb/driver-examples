@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
     environment:
       JDK_JAVA_OPTIONS: "-Dlogback.configurationFile=/config/logback.xml"
-      XTDB_LOGGING_LEVEL_PGWIRE: debug
+      XTDB_LOGGING_LEVEL: debug
     volumes:
       - xtdb-data:/var/lib/xtdb
       - ./xtdb.yaml:/config/xtdb.yaml
