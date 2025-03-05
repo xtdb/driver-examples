@@ -30,4 +30,13 @@ docker-compose down
 
 # copy the database into a zip on the host
 sudo zip -r xtdb-data.zip /var/lib/docker/volumes/devcontainer_xtdb-data/_data
+
+# copy the log file
+sudo cp /var/lib/docker/volumes/devcontainer_xtdb-logs/_data/xtdb.log .
+
+# pull the latest xtdb/xtdb:edge image
+docker compose pull xtdb
+
+# cleanup existing volumes and containers
+docker-compose down --volumes --remove-orphans
 ```
