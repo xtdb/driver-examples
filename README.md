@@ -36,6 +36,7 @@ For any assistance or questions, please [open an issue](https://github.com/xtdb/
 
 With Docker Compose installed, clone [this repo](https://github.com/xtdb/driver-examples) then run:
 
+`cd driver-examples/.devcontainer`
 `docker compose build`
 `docker compose up -d`
 `docker exec -it --user codespace app /bin/bash`
