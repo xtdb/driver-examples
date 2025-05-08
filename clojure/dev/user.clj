@@ -12,10 +12,11 @@
                   (xt-jdbc/->pg-obj {:xt/id "joe", :first-name "Joe", :a-map {:keys #{"nested" :edn 1 1.23}}})]
                  {:builder-fn xt-jdbc/builder-fn})
 
-  (jdbc/execute! conn
-                 ["PATCH INTO users RECORDS ?"
-                  (xt-jdbc/->pg-obj {:xt/id "joe", :likes "chocolate"})]
-                 {:builder-fn xt-jdbc/builder-fn})
+  ;; TODO https://github.com/xtdb/xtdb/issues/4403
+  #_(jdbc/execute! conn
+                   ["PATCH INTO users RECORDS ?"
+                    (xt-jdbc/->pg-obj {:xt/id "joe", :likes "chocolate"})]
+                   {:builder-fn xt-jdbc/builder-fn})
 
   (prn (jdbc/execute! conn ["SELECT * FROM users"] {:builder-fn xt-jdbc/builder-fn}))
 
