@@ -6,3 +6,5 @@ clojure/.lsp/
 /node/node_modules/
 java/target/
 /kotlin/target/
+/csharp/bin/
+/csharp/obj/
