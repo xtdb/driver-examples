@@ -1,4 +1,4 @@
-customer_id	store_id	first_name	last_name	email	address_id	activebool	create_date	last_update	active
+customer_id	store_id	first_name	last_name	email	address_id	activebool	create_date	_valid_from	active
 81	1	ANDREA	HENDERSON	ANDREA.HENDERSON@sakilacustomer.org	85	t	2006-02-14	2006-02-15 04:57:20	1
 144	1	CLARA	SHAW	CLARA.SHAW@sakilacustomer.org	148	t	2006-02-14	2006-02-15 04:57:20	1
 488	2	SHANE	MILLARD	SHANE.MILLARD@sakilacustomer.org	493	t	2006-02-14	2006-02-15 04:57:20	1

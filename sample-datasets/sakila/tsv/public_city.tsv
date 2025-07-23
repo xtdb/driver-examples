@@ -1,4 +1,4 @@
-city_id	city	country_id	last_update
+_id	city	country_id	_valid_from
 81	Birgunj	66	2006-02-15 04:45:25
 600	Ziguinchor	83	2006-02-15 04:45:25
 144	Dhule (Dhulia)	44	2006-02-15 04:45:25

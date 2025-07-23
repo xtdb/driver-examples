@@ -1,4 +1,4 @@
-inventory_id	film_id	store_id	last_update
+inventory_id	film_id	store_id	_valid_from
 854	188	1	2006-02-15 05:09:17
 1862	406	2	2006-02-15 05:09:17
 2550	559	2	2006-02-15 05:09:17

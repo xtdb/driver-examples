@@ -8,9 +8,8 @@
 ;; Database connection details (adjust as needed)
 (def db-spec {:dbtype "xtdb"
               :dbname "xtdb"
-              :host "xtdb"
-              :user "your-username"
-              :password "your-password"})
+              :host "localhost"
+              :user "xtdb"})
 
 (defn read-tsv-files [dir]
   "Reads all TSV files from the given directory. Returns a map of table-name to file-path."
@@ -105,7 +104,7 @@
                                  (map (fn [record-batch]
                                         (jdbc/with-transaction [tx conn]
                                           (with-open [ps (jdbc/prepare tx [(str "INSERT INTO " table-name " RECORDS ?")])]
-                                            (jdbc/execute-batch! ps (map vector (map xt-jdbc/->pg-obj record-batch)))))
+                                            (jdbc/execute-batch! ps (map vector record-batch))))
                                         (count record-batch)))
                                  + 0))]
           (log/debug "Finished inserting" total-count "records for table:" table-name))))))
