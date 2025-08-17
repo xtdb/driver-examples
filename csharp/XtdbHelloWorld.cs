@@ -10,7 +10,7 @@ class XtdbOdbcTest
 
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
         
-        // Required for XTDB ODBC support
+        // Required for XTDB support
         dataSourceBuilder.ConfigureTypeLoading(sb => {
             sb.EnableTypeLoading(false);
             sb.EnableTableCompositesLoading(false);
