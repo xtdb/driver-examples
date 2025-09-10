@@ -4,7 +4,7 @@ FROM mcr.microsoft.com/devcontainers/universal:2
 # Install prerequisites
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    openjdk-11-jdk \
+    openjdk-21-jdk \
     rlwrap \
     postgresql-client \
     odbc-postgresql \
