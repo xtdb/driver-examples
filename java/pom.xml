@@ -7,8 +7,8 @@
   <version>1.0-SNAPSHOT</version>
 
   <properties>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
     <!-- https://mvnrepository.com/artifact/com.xtdb/xtdb-jdbc -->
     <XTDB_VERSION>2.0.0-SNAPSHOT</XTDB_VERSION> <!-- Adjust to the latest snapshot -->
   </properties>
@@ -23,7 +23,7 @@
   <dependencies>
     <dependency>
       <groupId>com.xtdb</groupId>
-      <artifactId>xtdb-jdbc</artifactId>
+      <artifactId>xtdb-api</artifactId>
       <version>${XTDB_VERSION}</version>
     </dependency>
   </dependencies>
