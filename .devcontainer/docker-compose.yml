@@ -6,8 +6,8 @@ services:
     volumes:
       - xtdb-data:/var/lib/xtdb
       - xtdb-logs:/workspaces/logs
-      - ./init-volumes.sh:/init-volumes.sh
-    command: sh -c "chmod +x /init-volumes.sh && /init-volumes.sh"
+      - ./init-volumes.sh:/init-volumes.sh:ro
+    command: sh /init-volumes.sh
     user: root
 
   app:
