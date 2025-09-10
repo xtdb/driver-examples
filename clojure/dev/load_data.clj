@@ -2,13 +2,12 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [next.jdbc :as jdbc]
-            [xtdb.next.jdbc :as xt-jdbc]
             [clojure.tools.logging :as log]))
 
 ;; Database connection details (adjust as needed)
 (def db-spec {:dbtype "xtdb"
               :dbname "xtdb"
-              :host "localhost"
+              :host "xtdb"
               :user "xtdb"})
 
 (defn read-tsv-files [dir]
