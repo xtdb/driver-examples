@@ -29,4 +29,4 @@ RUN \
     exec bash;
 
 # Set the working directory
-WORKDIR /workspaces
+WORKDIR /workspaces/driver-examples
