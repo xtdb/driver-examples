@@ -5,7 +5,6 @@ services:
     container_name: init-volumes
     volumes:
       - xtdb-data:/var/lib/xtdb
-      - xtdb-logs:/workspaces/logs
       - ./init-volumes.sh:/init-volumes.sh:ro
     command: sh /init-volumes.sh
     user: root
@@ -23,10 +22,10 @@ services:
 
     volumes:
       - ..:/workspaces:cached
-      - xtdb-logs:/workspaces/logs
+      - xtdb-data:/var/lib/xtdb:ro
 
     # Overrides default command so things don't shut down after the process ends.
-    command: sleep infinity
+    command: sh -c "mkdir -p /workspaces/logs && ln -sfn /var/lib/xtdb/logs/xtdb.log /workspaces/logs/xtdb.log && sleep infinity"
 
     depends_on:
       - init-volumes
@@ -44,7 +43,6 @@ services:
       - xtdb-data:/var/lib/xtdb
       - ./xtdb.yaml:/config/xtdb.yaml
       - ./logback.xml:/config/logback.xml
-      - xtdb-logs:/workspaces/logs
     command: ["-f", "/config/xtdb.yaml"]
     depends_on:
       - init-volumes
@@ -53,4 +51,3 @@ services:
 
 volumes:
   xtdb-data:
-  xtdb-logs:

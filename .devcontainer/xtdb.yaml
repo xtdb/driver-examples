@@ -1,8 +1,8 @@
 log: !Local
-  path: "/var/lib/xtdb/log"
+  path: "/var/lib/xtdb/data/log"
 
 storage: !Local
-  path: "/var/lib/xtdb/buffers"
+  path: "/var/lib/xtdb/data/buffers"
 
 healthz:
   port: 8080
