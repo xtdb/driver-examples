@@ -10,7 +10,7 @@
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
     <!-- https://mvnrepository.com/artifact/com.xtdb/xtdb-jdbc -->
-    <XTDB_VERSION>2.0.0-SNAPSHOT</XTDB_VERSION> <!-- Adjust to the latest snapshot -->
+    <XTDB_VERSION>2.0.0</XTDB_VERSION> <!-- Adjust to the latest snapshot -->
   </properties>
 
   <repositories>
