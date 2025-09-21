@@ -11,7 +11,7 @@
 
 (defn verify []
   (with-open [conn (jdbc/get-connection db-spec)]
-    (let [result (jdbc/execute-one! conn ["SELECT count(*) as c FROM rental"] {:builder-fn xt-jdbc/builder-fn})]
+    (let [result (jdbc/execute-one! conn ["SELECT count(*) as c FROM rental"])]
       (if (= (:c result) 16044)
         (do
           (log/info "✅ Data verification passed")
