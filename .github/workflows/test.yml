@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       xtdb:
-        image: ghcr.io/xtdb/xtdb:edge
+        image: ghcr.io/xtdb/xtdb:2.0.0
         ports:
           - 5432:5432
           - 8080:8080
