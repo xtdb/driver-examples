@@ -9,7 +9,7 @@
   <properties>
     <kotlin.version>2.1.0</kotlin.version>
     <jvm.target>17</jvm.target>
-    <XTDB_VERSION>2.0.0-SNAPSHOT</XTDB_VERSION> <!-- Adjust as needed -->
+    <XTDB_VERSION>2.0.0</XTDB_VERSION> <!-- Adjust as needed -->
   </properties>
 
   <repositories>
@@ -34,7 +34,7 @@
     <!-- XTDB JDBC Driver -->
     <dependency>
       <groupId>com.xtdb</groupId>
-      <artifactId>xtdb-jdbc</artifactId>
+      <artifactId>xtdb-api</artifactId>
       <version>${XTDB_VERSION}</version>
     </dependency>
   </dependencies>
