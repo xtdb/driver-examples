@@ -14,7 +14,8 @@ defmodule ElixirProject.MixProject do
   # Specify your application's dependencies
   defp deps do
     [
-      {:postgrex, "~> 0.16.5"} # PostgreSQL driver for Elixir
+      {:postgrex, "~> 0.16.5"}, # PostgreSQL driver for Elixir
+      {:jason, "~> 1.4"} # JSON library (optional, for JSON support)
     ]
   end
 end
