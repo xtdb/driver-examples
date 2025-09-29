@@ -88,7 +88,7 @@ elixir --version 2>&1
 
 # Get dependencies
 echo "Installing Elixir dependencies..."
-cd /workspaces/elixir || exit 1
+cd /workspaces/driver-examples/elixir || exit 1
 mix local.hex --force
 mix local.rebar --force
 mix deps.get

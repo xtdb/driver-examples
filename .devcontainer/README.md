@@ -10,7 +10,7 @@ Use the VSCode 'SQL Tools' extension (connecting to the pre-installed XTDB conne
 
 ## Useful commands for running locally
 
-Note that your local repo root directory will be mounted to the `/workspaces` directory within the `app` container by default, so that you easily test and commit code changes.
+Note that your local repo root directory will be mounted to the `/workspaces/driver-examples` directory within the `app` container (matching GitHub Codespaces behavior), so that you can easily test and commit code changes.
 
 ```bash
 # start in the foreground, with xtdb logs
