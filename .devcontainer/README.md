@@ -40,3 +40,13 @@ docker compose pull xtdb
 # cleanup existing volumes and containers
 docker-compose down --volumes --remove-orphans
 ```
+
+## Claude Code - useful for iterating on this project
+
+Running inside the container as a poor man's sandbox
+
+```bash
+./shell.sh # open a shell within the app container
+npm install -g @anthropic-ai/claude-code # install claude in the container like you otherwise would
+claude --dangerously-skip-permissions # fresh log in, with max permissions (use at your own risk!)
+```

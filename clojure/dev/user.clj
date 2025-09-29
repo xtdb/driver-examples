@@ -49,7 +49,7 @@
     ;; (def client (get-client))
 
     (xt/execute-tx client
-                  [["PATCH INTO users RECORDS ?" {:xt/id "joe", :likes "chocolate"}]])
+                   [["PATCH INTO users RECORDS ?" {:xt/id "joe", :likes "chocolate"}]])
 
     (prn (xt/q client "SELECT * FROM users"))
 
@@ -66,7 +66,7 @@
     (prn (xt/q client "SELECT * FROM users FOR VALID_TIME AS OF '2027-01-01Z'"))
 
     ;; transactions are reified
-    (prn (xt/q client "SELECT * FROM xt.txs"))
+    (prn (xt/q client "SELECT * FROM xt.txs LIMIT 5"))
 
     ;; use XTQL within SQL
     (prn (xt/q client (format "SELECT * FROM (XTQL $$ %s $$) xtql_res WHERE _id = 'joe'"
@@ -84,5 +84,13 @@
 
   (tap> (jdbc/execute! (get-jdbc-conn) ["select * from inventory"]
                        {:schema-opts {:pk "_id"}}))
+
+
+  ;; reusing a jdbc connection will be somewhat faster
+  #_(with-open [conn (next.jdbc/get-connection client)]
+      (prn (with-out-str
+             (time
+              (doseq [i (range 250)]
+                (xt/execute-tx conn [[:put-docs :docs3 {:xt/id i}]]))))))
 
   )
