@@ -4,12 +4,38 @@ FROM mcr.microsoft.com/devcontainers/universal:2
 # Install prerequisites
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    openjdk-21-jdk \
+#    openjdk-21-jdk \
+    wget \
     rlwrap \
     postgresql-client \
     odbc-postgresql \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install OpenJDK JDK 25
+#RUN mkdir -p /usr/lib/jvm && \
+#     wget -O /tmp/openjdk-25_linux-x64_bin.tar.gz https://download.java.net/java/GA/jdk25/bd75d5f9689641da8e1daabeccb5528b/36/GPL/openjdk-25_linux-x64_bin.tar.gz && \
+#     tar -zxf /tmp/openjdk-25_linux-x64_bin.tar.gz -C /usr/lib/jvm/ && \
+#     rm /tmp/openjdk-25_linux-x64_bin.tar.gz && \
+#     update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-25/bin/java 1 && \
+#     update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-25/bin/javac 1 && \
+#     update-alternatives --install /usr/bin/jar jar /usr/lib/jvm/jdk-25/bin/jar 1
+
+# Set JAVA_HOME and update PATH to prioritize JDK 25
+#ENV JAVA_HOME=/usr/lib/jvm/jdk-25
+
+RUN mkdir -p /usr/lib/jvm && \
+     wget -O /tmp/openjdk-24_linux-x64_bin.tar.gz https://download.java.net/java/GA/jdk24.0.2/fdc5d0102fe0414db21410ad5834341f/12/GPL/openjdk-24.0.2_linux-x64_bin.tar.gz && \
+     tar -zxf /tmp/openjdk-24_linux-x64_bin.tar.gz -C /usr/lib/jvm/ && \
+     rm /tmp/openjdk-24_linux-x64_bin.tar.gz && \
+     update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-24.0.2/bin/java 1 && \
+     update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-24.0.2/bin/javac 1 && \
+     update-alternatives --install /usr/bin/jar jar /usr/lib/jvm/jdk-24.0.2/bin/jar 1
+
+# Set JAVA_HOME and update PATH to prioritize JDK 24
+ENV JAVA_HOME=/usr/lib/jvm/jdk-24.0.2
+
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Install Clojure CLI using the official script
 RUN curl -L -O https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh && \
