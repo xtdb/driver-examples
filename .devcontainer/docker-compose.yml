@@ -38,7 +38,6 @@ services:
     user: "20000:20000"
     environment:
       JDK_JAVA_OPTIONS: "-Dlogback.configurationFile=/config/logback.xml"
-      XTDB_LOGGING_LEVEL: debug
     volumes:
       - xtdb-data:/var/lib/xtdb
       - ./xtdb.yaml:/config/xtdb.yaml

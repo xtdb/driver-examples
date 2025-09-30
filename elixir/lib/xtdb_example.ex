@@ -318,4 +318,151 @@ defmodule XTDBExample do
     IO.puts("  ✓ Boolean values")
     IO.puts("  ✓ Special characters in strings (properly escaped)")
   end
+
+  def test_copy_simple do
+    IO.puts("\n=== Testing Simple COPY FROM STDIN (like Postgrex test suite) ===")
+
+    {:ok, pid} = Postgrex.start_link(hostname: "xtdb", port: 5432, database: "xtdb")
+
+    try do
+      # Setup test table
+      IO.puts("Setting up test table...")
+      Postgrex.query!(pid, "INSERT INTO simple_copy_test RECORDS {_id: 'init', value: 1}", [])
+
+      # Test: Using stream() directly without prepare (like Postgrex test suite)
+      IO.puts("\nUsing stream() with COPY statement directly (no prepare)")
+      result = Postgrex.transaction(pid, fn conn ->
+        try do
+          stream = Postgrex.stream(conn, "COPY simple_copy_test FROM STDIN WITH (FORMAT 'transit-json')", [])
+
+          # Try to stream data
+          data = [
+            "[\"^ \",\"~:xt/id\",\"copy_1\",\"~:value\",100]\n",
+            "[\"^ \",\"~:xt/id\",\"copy_2\",\"~:value\",200]\n"
+          ]
+
+          IO.puts("Streaming data...")
+          stream_result = Enum.into(data, stream)
+          IO.puts("✓ Stream completed: #{inspect(stream_result == stream)}")
+
+          # Verify
+          case Postgrex.query!(conn, "SELECT _id, value FROM simple_copy_test WHERE _id LIKE 'copy_%' ORDER BY _id", []) do
+            %{rows: rows} ->
+              IO.puts("✓ Data inserted successfully:")
+              Enum.each(rows, fn row -> IO.puts("    #{inspect(row)}") end)
+          end
+
+          Postgrex.rollback(conn, :done)
+        rescue
+          e ->
+            IO.puts("✗ Error: #{inspect(e)}")
+            IO.puts("  Message: #{Exception.message(e)}")
+            Postgrex.rollback(conn, {:error, e})
+        end
+      end)
+
+      case result do
+        {:error, :done} -> IO.puts("\n✓ Transaction rolled back successfully")
+        {:error, {:error, _}} -> IO.puts("\n✗ Test failed with error")
+        _ -> IO.puts("\nUnexpected result: #{inspect(result)}")
+      end
+
+    rescue
+      e ->
+        IO.puts("✗ Exception during test: #{inspect(e)}")
+        :error
+    after
+      GenServer.stop(pid)
+    end
+  end
+
+  def test_copy_from_stdin do
+    IO.puts("\n=== Testing COPY FROM STDIN with copy_data option ===")
+
+    {:ok, pid} = Postgrex.start_link(hostname: "xtdb", port: 5432, database: "xtdb")
+
+    try do
+      # Setup test table
+      IO.puts("Setting up test table...")
+      Postgrex.query!(pid, "INSERT INTO copy_test RECORDS {_id: 'init', name: 'Init'}", [])
+
+      # Test data in transit-json format with correct xt/id keyword
+      test_data1 = "[\"^ \",\"~:xt/id\",\"copy_1\",\"~:name\",\"First Copy\",\"~:active\",true]"
+      test_data2 = "[\"^ \",\"~:xt/id\",\"copy_2\",\"~:name\",\"Second Copy\",\"~:active\",false]"
+
+      IO.puts("Attempting COPY FROM STDIN with streaming...")
+      IO.puts("Data to copy:")
+      IO.puts("  #{test_data1}")
+      IO.puts("  #{test_data2}")
+
+      # Use streaming approach with prepare and copy_data: true
+      copy_sql = "COPY copy_test FROM STDIN WITH (FORMAT 'transit-json')"
+
+      case Postgrex.prepare(pid, "", copy_sql, [copy_data: true]) do
+        {:ok, query} ->
+          # Use transaction with streaming
+          result = Postgrex.transaction(pid, fn(conn) ->
+            try do
+              stream = Postgrex.stream(conn, query, [])
+
+              IO.puts("Streaming first batch of data...")
+              stream_result = Enum.into([test_data1 <> "\n", test_data2 <> "\n"], stream)
+
+              if stream_result == stream do
+                IO.puts("✓ Data streamed successfully")
+              else
+                IO.puts("⚠ Stream result: #{inspect(stream_result)}")
+              end
+
+              IO.puts("✓ COPY FROM STDIN streaming succeeded!")
+
+              # Verify the data was inserted
+              case Postgrex.query!(conn, "SELECT _id, name, active FROM copy_test WHERE _id LIKE 'copy_%' ORDER BY _id", []) do
+                %{rows: rows} ->
+                  IO.puts("✓ Verification query succeeded:")
+                  Enum.each(rows, fn row ->
+                    IO.puts("    #{inspect(row)}")
+                  end)
+              end
+
+              Postgrex.rollback(conn, :done)
+            rescue
+              e ->
+                if String.contains?(to_string(e), "COPY IN not in progress") do
+                  IO.puts("✗ BUG REPRODUCED: 'COPY IN not in progress' error!")
+                  IO.puts("  Error: #{inspect(e)}")
+                  Postgrex.rollback(conn, {:error, :bug_reproduced})
+                else
+                  IO.puts("✗ COPY FROM STDIN failed with different error:")
+                  IO.puts("  #{inspect(e)}")
+                  Postgrex.rollback(conn, {:error, :failed})
+                end
+            end
+          end)
+
+          case result do
+            {:error, :rollback} ->
+              IO.puts("✓ Transaction rolled back as expected")
+              :success
+            {:error, :bug_reproduced} ->
+              :bug_reproduced
+            {:error, :failed} ->
+              :failed
+            _ ->
+              :success
+          end
+
+        {:error, error} ->
+          IO.puts("✗ Failed to prepare COPY statement: #{inspect(error)}")
+          :failed
+      end
+
+    rescue
+      e ->
+        IO.puts("✗ Exception during COPY test: #{inspect(e)}")
+        :error
+    after
+      GenServer.stop(pid)
+    end
+  end
 end
