@@ -12,7 +12,7 @@ If you would like to run the Dev Container setup fully locally (offline, and wit
 
 ## Running your first queries
 
-The VSCode 'SQL Tools' extension is pre-configured to connects to the running XTDB Docker container. You can use this extension to explore the database and run queries.
+The VSCode 'SQL Tools' extension is pre-configured to connect to the running XTDB Docker container. You can use this extension to explore the database and run queries.
 
 Alternatively open the terminal and run: `psql -h xtdb xtdb`
 
@@ -20,7 +20,7 @@ You should now be able to execute a query like `SELECT 1 + 1`
 
 ## Plenty to explore
 
-Within the `driver-examples` directory you will find a range of subdirectories for various languages, where each contains a minimal example as well as a `run.sh` script that you can use to execute the example (the script will also first install the dependencies).
+Within the `driver-examples` directory you will find a range of subdirectories for various languages, where each contains a minimal example as well as a `run.sh` script that you can use to execute the example (the script will also first install any dependencies).
 
 All examples are connected to the same XTDB instance, running as an *ephemeral* Docker container within the sandbox environment (no data is persisted).
 
@@ -36,10 +36,12 @@ For any assistance or questions, please [open an issue](https://github.com/xtdb/
 
 With Docker Compose installed, clone [this repo](https://github.com/xtdb/driver-examples) then run:
 
-`cd driver-examples/.devcontainer`
-`docker compose build`
-`docker compose up -d`
-`docker exec -it --user codespace app /bin/bash`
+```bash
+cd driver-examples/.devcontainer
+docker compose build
+docker compose up -d
+docker exec -it --user codespace app /bin/bash
+```
 
 Note that you will likely still need an internet connection after the containers have started to download dependencies.
 
