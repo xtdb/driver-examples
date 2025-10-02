@@ -56,8 +56,10 @@
     ;; access temporal columns
     (prn (xt/q client "SELECT *, _valid_time, _system_time FROM users"))
 
-    ;; the "database as a value" semantics are achieved with _system_time columns and SNAPSHOT_TIME
-    (prn (xt/q client "SETTING SNAPSHOT_TIME TO '2020-01-01Z' SELECT * FROM users"))
+    ;; the "database as a value" semantics are achieved with _system_time columns and a 'basis' SNAPSHOT_TOKEN
+    ;; you can create a token using `SHOW SNAPSHOT_TOKEN` and the pass it in to separate queries on separate nodes as if they were all executing against a stable view of data
+    ;; it is also possible to construct SNAPSHOT_TOKEN
+    (prn (xt/q client ["SETTING SNAPSHOT_TOKEN TO ? SELECT * FROM users" (xtdb.basis/->time-basis-str {"xtdb" [#inst "2020-01-01Z"]})]))
 
     ;; users can time-travel with DEFAULT VALID_TIME
     (prn (xt/q client "SETTING DEFAULT VALID_TIME AS OF '2027-01-01Z' SELECT * FROM users"))
