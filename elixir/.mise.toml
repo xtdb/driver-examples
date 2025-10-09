@@ -1,0 +1,46 @@
+# Elixir and Erlang managed by system package manager (pacman)
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.setup]
+description = "Install Elixir and required Erlang modules, setup Hex and Rebar"
+run = """
+# Install Elixir if not present (pacman will handle Erlang dependencies)
+if ! command -v elixir &> /dev/null; then
+  echo "Installing Elixir..."
+  sudo pacman -S --noconfirm elixir
+fi
+
+# Install required Erlang modules for Mix/Hex (without GUI dependencies)
+# These are needed by Mix but not pulled in by erlang-core
+echo "Installing required Erlang modules..."
+sudo pacman -S --noconfirm erlang-asn1 erlang-public_key erlang-ssl erlang-inets erlang-parsetools
+
+# Setup Hex and Rebar
+mix local.hex --force
+mix local.rebar --force
+"""
+
+[tasks.deps]
+description = "Install Elixir dependencies"
+run = """
+mise run setup
+mix deps.get
+"""
+
+[tasks.run]
+description = "Run Elixir examples"
+depends = ["deps"]
+run = """
+echo "=== Running XTDB Elixir Examples ==="
+mix run -e "XTDBExample.connect_and_query()"
+echo ""
+echo "=== Running COPY FROM STDIN Test ==="
+mix run -e "XTDBExample.test_copy_from_stdin()"
+echo ""
+echo "=== Demonstrating Transit-JSON Format ==="
+mix run -e "XTDBExample.demonstrate_format()"
+echo ""
+echo "✓ All examples completed successfully!"
+"""

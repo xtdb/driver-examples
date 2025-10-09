@@ -1,1 +1,1 @@
-docker exec -it --user codespace app /bin/bash
+docker exec -it --user codespace app /usr/bin/fish

@@ -1,0 +1,14 @@
+[tools]
+python = "3.12"
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.deps]
+description = "Install Python dependencies"
+run = "pip install -r requirements.txt"
+
+[tasks.run]
+description = "Run Python example"
+depends = ["deps"]
+run = "python main.py"

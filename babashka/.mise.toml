@@ -1,0 +1,9 @@
+[tools]
+"github:babashka/babashka" = "latest"
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.run]
+description = "Run Babashka example"
+run = "mise exec -- bb -m my-project.main"

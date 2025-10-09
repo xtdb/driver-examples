@@ -25,6 +25,10 @@ docker-compose logs --follow xtdb
 # enter the app container's shell
 docker exec -it --user codespace app /bin/bash
 
+# once inside, cd into a language directory and run examples
+cd /workspaces/driver-examples/python
+mise run
+
 # shutdown
 docker-compose down
 
@@ -43,10 +47,10 @@ docker-compose down --volumes --remove-orphans
 
 ## Claude Code - useful for iterating on this project
 
-Running inside the container as a poor man's sandbox
+A helpful command for running inside the container as a poor man's sandbox:
 
 ```bash
 ./shell.sh # open a shell within the app container
-npm install -g @anthropic-ai/claude-code # install claude in the container like you otherwise would
-claude --dangerously-skip-permissions # fresh log in, with max permissions (use at your own risk!)
+# within that shell, run a fresh Claude login with max permissions (use at your own risk!!)
+npm install -g @anthropic-ai/claude-code && claude --dangerously-skip-permissions --resume
 ```

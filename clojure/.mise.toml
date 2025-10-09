@@ -1,0 +1,29 @@
+[tools]
+java = "21"
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.setup]
+description = "Install Clojure CLI"
+run = """
+if ! command -v clojure &> /dev/null; then
+  echo "Installing Clojure CLI..."
+  cd /tmp
+  curl -L -O https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh
+  chmod +x linux-install.sh
+  sudo ./linux-install.sh
+  rm linux-install.sh
+fi
+"""
+
+[tasks.run]
+description = "Run Clojure example"
+run = """
+mise run setup
+clojure -M:run 2>&1 | grep -v 'Downloading:'
+"""
+
+[tasks.repl]
+description = "Start Clojure REPL"
+run = "clojure -M:dev:repl"

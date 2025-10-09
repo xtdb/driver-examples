@@ -1,0 +1,163 @@
+# mise configuration for XTDB Driver Examples
+# See https://mise.jdx.dev for documentation
+#
+# NOTE: Language-specific tools and tasks are defined in each directory's .mise.toml
+# This file contains thin wrappers that delegate to subdirectory tasks
+
+[tasks.setup]
+description = "Install all language runtimes and dependencies"
+run = """
+echo "Installing language-specific tools and dependencies..."
+for dir in node python ruby go java kotlin csharp elixir clojure babashka php; do
+  if [ -d "$dir" ]; then
+    echo "  Setting up $dir..."
+    (cd "$dir" && mise install && mise run setup 2>/dev/null || true) || echo "    Warning: Failed to setup $dir"
+  fi
+done
+echo "✓ Setup complete"
+"""
+
+# Python tasks
+[tasks."python:deps"]
+description = "Install Python dependencies"
+dir = "python"
+run = "mise run deps"
+
+[tasks."python:run"]
+description = "Run Python example"
+dir = "python"
+run = "mise run run"
+
+# Node.js tasks
+[tasks."node:deps"]
+description = "Install Node.js dependencies"
+dir = "node"
+run = "mise run deps"
+
+[tasks."node:run"]
+description = "Run Node.js example"
+dir = "node"
+run = "mise run run"
+
+# Ruby tasks
+[tasks."ruby:deps"]
+description = "Install Ruby dependencies"
+dir = "ruby"
+run = "mise run deps"
+
+[tasks."ruby:run"]
+description = "Run Ruby example"
+dir = "ruby"
+run = "mise run run"
+
+# Go tasks
+[tasks."go:deps"]
+description = "Download Go dependencies"
+dir = "go"
+run = "mise run deps"
+
+[tasks."go:run"]
+description = "Run Go example"
+dir = "go"
+run = "mise run run"
+
+# Elixir tasks
+[tasks."elixir:deps"]
+description = "Install Elixir dependencies"
+dir = "elixir"
+run = "mise run deps"
+
+[tasks."elixir:run"]
+description = "Run Elixir examples"
+dir = "elixir"
+run = "mise run run"
+
+# Java tasks
+[tasks."java:run"]
+description = "Run Java example"
+dir = "java"
+run = "mise run run"
+
+# Kotlin tasks
+[tasks."kotlin:run"]
+description = "Run Kotlin example"
+dir = "kotlin"
+run = "mise run run"
+
+# C tasks
+[tasks."c:build"]
+description = "Build C example"
+dir = "c"
+run = "mise run build"
+
+[tasks."c:run"]
+description = "Run C example"
+dir = "c"
+run = "mise run run"
+
+# C# tasks
+[tasks."csharp:build"]
+description = "Build C# example"
+dir = "csharp"
+run = "mise run build"
+
+[tasks."csharp:run"]
+description = "Run C# example"
+dir = "csharp"
+run = "mise run run"
+
+# Clojure tasks
+[tasks."clojure:run"]
+description = "Run Clojure example"
+dir = "clojure"
+run = "mise run run"
+
+[tasks."clojure:repl"]
+description = "Start Clojure REPL"
+dir = "clojure"
+run = "mise run repl"
+
+# Babashka tasks
+[tasks."babashka:run"]
+description = "Run Babashka example"
+dir = "babashka"
+run = "mise run run"
+
+# PHP tasks
+[tasks."php:run"]
+description = "Run PHP example"
+dir = "php"
+run = "mise run run"
+
+# Run all examples
+[tasks."run:all"]
+description = "Run all language examples"
+run = """
+for lang in python node ruby go php java kotlin c csharp elixir clojure babashka; do
+  echo "========================================="
+  echo "Running $lang example..."
+  echo "========================================="
+  mise run $lang:run || echo "❌ $lang example failed"
+  echo ""
+done
+"""
+
+# XTDB management tasks
+[tasks."xtdb:logs"]
+description = "Show XTDB logs"
+run = "tail -f logs/xtdb.log"
+
+# SQL examples (using psql)
+[tasks."sql:copy-transit"]
+description = "Run COPY FROM transit-json example"
+dir = "sql"
+run = "./copy-transit-example.sh"
+
+# Sample datasets
+[tasks."sakila:load"]
+description = "Load Sakila sample dataset"
+dir = "sample-datasets/sakila"
+run = "./load.sh"
+
+# [env] section removed - was causing mise to look for java plugin
+# Set environment variables in shell or docker-compose instead

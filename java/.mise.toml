@@ -1,0 +1,10 @@
+[tools]
+java = "21"
+maven = "latest"
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.run]
+description = "Run Java example"
+run = "mvn -q clean compile && mvn exec:java -Dexec.mainClass=\"XtdbHelloWorld\""

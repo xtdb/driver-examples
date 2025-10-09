@@ -1,0 +1,14 @@
+[tools]
+node = "lts"
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.deps]
+description = "Install Node.js dependencies"
+run = "npm install"
+
+[tasks.run]
+description = "Run Node.js example"
+depends = ["deps"]
+run = "npm start"

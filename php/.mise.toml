@@ -1,0 +1,30 @@
+# PHP uses system package manager installation
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.setup]
+description = "Install PHP and pgsql extension if needed"
+run = """
+if ! command -v php &> /dev/null; then
+  echo "Installing PHP and php-pgsql extension..."
+  sudo pacman -S --noconfirm php php-pgsql
+elif ! php -m | grep -q pgsql; then
+  echo "Installing php-pgsql extension..."
+  sudo pacman -S --noconfirm php-pgsql
+fi
+
+# Enable pgsql extension if not already enabled
+if ! php -m | grep -q pgsql; then
+  echo "Enabling pgsql extension..."
+  echo "extension=pgsql" | sudo tee /etc/php/conf.d/pgsql.ini > /dev/null
+  echo "extension=pdo_pgsql" | sudo tee -a /etc/php/conf.d/pgsql.ini > /dev/null
+fi
+"""
+
+[tasks.run]
+description = "Run PHP example"
+run = """
+mise run setup
+php XtdbHelloWorld.php
+"""

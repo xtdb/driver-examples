@@ -1,0 +1,37 @@
+# C uses system compiler and build tools
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.setup]
+description = "Install C build tools and dependencies if needed"
+run = """
+# Check if we need to install build tools
+NEED_INSTALL=0
+if ! command -v git &> /dev/null; then
+  NEED_INSTALL=1
+fi
+if ! command -v make &> /dev/null; then
+  NEED_INSTALL=1
+fi
+if ! pacman -Q postgresql-libs &> /dev/null; then
+  NEED_INSTALL=1
+fi
+
+if [ $NEED_INSTALL -eq 1 ]; then
+  echo "Installing git, base-devel, and postgresql-libs..."
+  sudo pacman -S --noconfirm git base-devel postgresql-libs
+fi
+"""
+
+[tasks.build]
+description = "Build C example"
+run = """
+mise run setup
+make
+"""
+
+[tasks.run]
+description = "Run C example"
+depends = ["build"]
+run = "./trades -h xtdb -d xtdb -p 5432"

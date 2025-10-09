@@ -1,0 +1,48 @@
+# Ruby uses system package manager on Arch Linux
+
+[env]
+_.path = ["~/.local/share/gem/ruby/3.4.0/bin"]
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.setup]
+description = "Install Ruby and Bundler"
+run = """
+# Install base-devel (gcc, make, etc.) required for native gem extensions
+if ! pacman -Q base-devel &> /dev/null; then
+  echo "Installing build tools (base-devel)..."
+  sudo pacman -S --noconfirm base-devel
+fi
+
+# Install Ruby via pacman if not already installed
+if ! command -v ruby &> /dev/null; then
+  echo "Installing Ruby via pacman..."
+  sudo pacman -S --noconfirm ruby
+fi
+
+# Install PostgreSQL client libraries (required by pg gem)
+if ! pacman -Q postgresql-libs &> /dev/null; then
+  echo "Installing PostgreSQL client libraries..."
+  sudo pacman -S --noconfirm postgresql-libs
+fi
+
+# Install Bundler if not already installed
+if ! command -v bundle &> /dev/null; then
+  echo "Installing Bundler..."
+  gem install bundler
+fi
+"""
+
+[tasks.deps]
+description = "Install Ruby dependencies"
+depends = ["setup"]
+run = """
+bundle config set --local path 'vendor/bundle'
+bundle install
+"""
+
+[tasks.run]
+description = "Run Ruby example"
+depends = ["deps"]
+run = "bundle exec ruby main.rb"

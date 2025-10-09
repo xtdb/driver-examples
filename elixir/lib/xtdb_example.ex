@@ -4,7 +4,8 @@ defmodule XTDBExample do
       Postgrex.start_link(
         hostname: "xtdb",
         port: 5432,
-        database: "xtdb"
+        database: "xtdb",
+        username: "xtdb"
       )
 
     # Example with transit-json including all supported types
@@ -322,7 +323,7 @@ defmodule XTDBExample do
   def test_copy_simple do
     IO.puts("\n=== Testing Simple COPY FROM STDIN (like Postgrex test suite) ===")
 
-    {:ok, pid} = Postgrex.start_link(hostname: "xtdb", port: 5432, database: "xtdb")
+    {:ok, pid} = Postgrex.start_link(hostname: "xtdb", port: 5432, database: "xtdb", username: "xtdb")
 
     try do
       # Setup test table
@@ -379,7 +380,7 @@ defmodule XTDBExample do
   def test_copy_from_stdin do
     IO.puts("\n=== Testing COPY FROM STDIN with copy_data option ===")
 
-    {:ok, pid} = Postgrex.start_link(hostname: "xtdb", port: 5432, database: "xtdb")
+    {:ok, pid} = Postgrex.start_link(hostname: "xtdb", port: 5432, database: "xtdb", username: "xtdb")
 
     try do
       # Setup test table

@@ -1,0 +1,14 @@
+[tools]
+go = "1.23"
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.deps]
+description = "Download Go dependencies"
+run = "go mod download"
+
+[tasks.run]
+description = "Run Go example"
+depends = ["deps"]
+run = "go run main.go"

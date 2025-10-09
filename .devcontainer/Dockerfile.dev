@@ -1,58 +1,47 @@
 # Dockerfile
-FROM mcr.microsoft.com/devcontainers/universal:2
+FROM archlinux:base
 
-# Install prerequisites
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Update system and install essential packages
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm \
     curl \
-#    openjdk-21-jdk \
-    wget \
+    ca-certificates \
     rlwrap \
-    postgresql-client \
-    odbc-postgresql \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    sudo \
+    fish \
+    vi \
+    git \
+    && pacman -Scc --noconfirm
 
-# Install OpenJDK JDK 25
-#RUN mkdir -p /usr/lib/jvm && \
-#     wget -O /tmp/openjdk-25_linux-x64_bin.tar.gz https://download.java.net/java/GA/jdk25/bd75d5f9689641da8e1daabeccb5528b/36/GPL/openjdk-25_linux-x64_bin.tar.gz && \
-#     tar -zxf /tmp/openjdk-25_linux-x64_bin.tar.gz -C /usr/lib/jvm/ && \
-#     rm /tmp/openjdk-25_linux-x64_bin.tar.gz && \
-#     update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-25/bin/java 1 && \
-#     update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-25/bin/javac 1 && \
-#     update-alternatives --install /usr/bin/jar jar /usr/lib/jvm/jdk-25/bin/jar 1
+# Create codespace user
+RUN useradd -m -s /bin/bash -u 1000 codespace && \
+    echo "codespace ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Set JAVA_HOME and update PATH to prioritize JDK 25
-#ENV JAVA_HOME=/usr/lib/jvm/jdk-25
+# Install mise for the codespace user
+USER codespace
+WORKDIR /home/codespace
 
-RUN mkdir -p /usr/lib/jvm && \
-     wget -O /tmp/openjdk-24_linux-x64_bin.tar.gz https://download.java.net/java/GA/jdk24.0.2/fdc5d0102fe0414db21410ad5834341f/12/GPL/openjdk-24.0.2_linux-x64_bin.tar.gz && \
-     tar -zxf /tmp/openjdk-24_linux-x64_bin.tar.gz -C /usr/lib/jvm/ && \
-     rm /tmp/openjdk-24_linux-x64_bin.tar.gz && \
-     update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-24.0.2/bin/java 1 && \
-     update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-24.0.2/bin/javac 1 && \
-     update-alternatives --install /usr/bin/jar jar /usr/lib/jvm/jdk-24.0.2/bin/jar 1
+RUN curl https://mise.run | sh && \
+    echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc && \
+    echo 'eval "$(~/.local/bin/mise activate bash --shims)"' >> ~/.bashrc && \
+    mkdir -p ~/.config/fish && \
+    echo '~/.local/bin/mise activate fish | source' >> ~/.config/fish/config.fish
 
-# Set JAVA_HOME and update PATH to prioritize JDK 24
-ENV JAVA_HOME=/usr/lib/jvm/jdk-24.0.2
+# Configure mise to automatically trust the workspace directory
+RUN mkdir -p ~/.config/mise && \
+    echo '[settings]' > ~/.config/mise/config.toml && \
+    echo 'trusted_config_paths = ["/workspaces/driver-examples"]' >> ~/.config/mise/config.toml
 
-ENV PATH="${JAVA_HOME}/bin:${PATH}"
+# Add mise to PATH for current session
+ENV PATH="/home/codespace/.local/bin:${PATH}"
 
-# Install Clojure CLI using the official script
-RUN curl -L -O https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh && \
-    chmod +x linux-install.sh && \
-    ./linux-install.sh && \
-    rm linux-install.sh
+# Copy tool-versions file to install language runtimes
+COPY --chown=codespace:codespace .tool-versions /tmp/.tool-versions
 
-# Install babashka using the official script
-# RUN bash < <(curl -s https://raw.githubusercontent.com/babashka/babashka/master/install)
-
-RUN \
-    # configure git to get rid of detached head warnings
-    git config --global advice.detachedHead false; \
-    git clone https://github.com/asdf-vm/asdf.git $HOME/.asdf --branch v0.15.0; \
-    /bin/bash -c 'echo -e "\n\n## Configure ASDF \n. $HOME/.asdf/asdf.sh" >> ~/.bashrc'; \
-    /bin/bash -c 'echo -e "\n\n## ASDF Bash Completion: \n. $HOME/.asdf/completions/asdf.bash" >> ~/.bashrc'; \
-    exec bash;
+# Install language runtimes during build
+RUN cd /tmp && \
+    ~/.local/bin/mise install && \
+    rm /tmp/.tool-versions
 
 # Set the working directory
 WORKDIR /workspaces/driver-examples

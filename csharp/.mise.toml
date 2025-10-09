@@ -1,0 +1,26 @@
+[tools]
+"asdf:mise-plugins/mise-dotnet" = "9.0"
+
+[tasks.default]
+depends = ["run"]
+
+[tasks.setup]
+description = "Install C# system dependencies if needed"
+run = """
+if ! pacman -Q icu &> /dev/null; then
+  echo "Installing ICU for .NET globalization..."
+  sudo pacman -S --noconfirm icu
+fi
+"""
+
+[tasks.build]
+description = "Build C# example"
+run = """
+mise run setup
+mise exec -- dotnet build
+"""
+
+[tasks.run]
+description = "Run C# example"
+depends = ["build"]
+run = "mise exec -- dotnet run"
