@@ -12,3 +12,8 @@ run = "pip install -r requirements.txt"
 description = "Run Python example"
 depends = ["deps"]
 run = "python main.py"
+
+[tasks.test]
+description = "Run Python tests"
+depends = ["deps"]
+run = "pytest -v tests/"

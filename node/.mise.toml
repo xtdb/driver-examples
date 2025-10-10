@@ -12,3 +12,8 @@ run = "npm install"
 description = "Run Node.js example"
 depends = ["deps"]
 run = "npm start"
+
+[tasks.test]
+description = "Run Node.js tests"
+depends = ["deps"]
+run = "node --test test/*.test.mjs"

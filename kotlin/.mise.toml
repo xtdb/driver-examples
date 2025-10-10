@@ -7,4 +7,8 @@ depends = ["run"]
 
 [tasks.run]
 description = "Run Kotlin example"
-run = "mvn -q clean compile && mvn exec:java -Dexec.mainClass=MainKt"
+run = "./gradlew run"
+
+[tasks.test]
+description = "Run Kotlin tests"
+run = "./gradlew test"

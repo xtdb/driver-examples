@@ -7,3 +7,7 @@ depends = ["run"]
 [tasks.run]
 description = "Run Babashka example"
 run = "mise exec -- bb -m my-project.main"
+
+[tasks.test]
+description = "Run Babashka tests"
+run = "mise exec -- bb run_tests.clj"

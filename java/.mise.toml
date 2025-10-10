@@ -8,3 +8,7 @@ depends = ["run"]
 [tasks.run]
 description = "Run Java example"
 run = "mvn -q clean compile && mvn exec:java -Dexec.mainClass=\"XtdbHelloWorld\""
+
+[tasks.test]
+description = "Run Java tests"
+run = "mvn test"

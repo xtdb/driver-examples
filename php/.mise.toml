@@ -22,9 +22,28 @@ if ! php -m | grep -q pgsql; then
 fi
 """
 
-[tasks.run]
-description = "Run PHP example"
+[tasks.deps]
+description = "Install PHP dependencies"
 run = """
 mise run setup
-php XtdbHelloWorld.php
+if [ -f composer.json ]; then
+  if [ -f composer.phar ]; then
+    php composer.phar install
+  elif command -v composer &> /dev/null; then
+    composer install
+  else
+    echo "ERROR: composer not found. Please install composer first."
+    exit 1
+  fi
+fi
 """
+
+[tasks.run]
+description = "Run PHP example"
+depends = ["setup"]
+run = "php XtdbHelloWorld.php"
+
+[tasks.test]
+description = "Run PHP tests"
+depends = ["deps"]
+run = "vendor/bin/phpunit"

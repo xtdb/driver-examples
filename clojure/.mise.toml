@@ -27,3 +27,10 @@ clojure -M:run 2>&1 | grep -v 'Downloading:'
 [tasks.repl]
 description = "Start Clojure REPL"
 run = "clojure -M:dev:repl"
+
+[tasks.test]
+description = "Run Clojure tests"
+run = """
+mise run setup
+clojure -M:test 2>&1 | grep -v 'Downloading:'
+"""

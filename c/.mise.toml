@@ -35,3 +35,10 @@ make
 description = "Run C example"
 depends = ["build"]
 run = "./trades -h xtdb -d xtdb -p 5432"
+
+[tasks.test]
+description = "Run C tests"
+run = """
+mise run setup
+make test
+"""

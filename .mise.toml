@@ -159,5 +159,47 @@ description = "Load Sakila sample dataset"
 dir = "sample-datasets/sakila"
 run = "./load.sh"
 
+# Test all languages
+[tasks."test:all"]
+description = "Run tests for all languages (127 tests across 12 languages)"
+run = """
+echo "==========================================="
+echo "Running test suite for all languages"
+echo "==========================================="
+echo ""
+
+TOTAL_PASSED=0
+TOTAL_FAILED=0
+
+# All 12 languages with test suites
+for lang in python node go ruby java kotlin clojure elixir babashka csharp php c; do
+  echo "========================================="
+  echo "Testing $lang..."
+  echo "========================================="
+
+  if [ -d "$lang" ]; then
+    # Special handling for Java and Kotlin which don't use mise for tests
+    if [ "$lang" = "java" ]; then
+      (cd $lang && mvn test -q) && { echo "✓ $lang tests passed"; TOTAL_PASSED=$((TOTAL_PASSED+1)); } || { echo "✗ $lang tests failed"; TOTAL_FAILED=$((TOTAL_FAILED+1)); }
+    elif [ "$lang" = "kotlin" ]; then
+      (cd $lang && ./gradlew test -q) && { echo "✓ $lang tests passed"; TOTAL_PASSED=$((TOTAL_PASSED+1)); } || { echo "✗ $lang tests failed"; TOTAL_FAILED=$((TOTAL_FAILED+1)); }
+    else
+      # All other languages use mise run test
+      (cd $lang && mise run test) && { echo "✓ $lang tests passed"; TOTAL_PASSED=$((TOTAL_PASSED+1)); } || { echo "✗ $lang tests failed"; TOTAL_FAILED=$((TOTAL_FAILED+1)); }
+    fi
+  else
+    echo "⚠ $lang directory not found"
+    TOTAL_FAILED=$((TOTAL_FAILED+1))
+  fi
+  echo ""
+done
+
+echo "==========================================="
+echo "Test suite complete"
+echo "Languages passed: $TOTAL_PASSED/12"
+echo "Languages failed: $TOTAL_FAILED/12"
+echo "==========================================="
+"""
+
 # [env] section removed - was causing mise to look for java plugin
 # Set environment variables in shell or docker-compose instead

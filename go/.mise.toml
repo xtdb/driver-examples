@@ -12,3 +12,8 @@ run = "go mod download"
 description = "Run Go example"
 depends = ["deps"]
 run = "go run main.go"
+
+[tasks.test]
+description = "Run Go tests"
+depends = ["deps"]
+run = "go test -v"

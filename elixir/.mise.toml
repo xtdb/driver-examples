@@ -44,3 +44,8 @@ mix run -e "XTDBExample.demonstrate_format()"
 echo ""
 echo "✓ All examples completed successfully!"
 """
+
+[tasks.test]
+description = "Run Elixir tests"
+depends = ["deps"]
+run = "mix test"

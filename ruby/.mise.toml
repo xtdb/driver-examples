@@ -46,3 +46,8 @@ bundle install
 description = "Run Ruby example"
 depends = ["deps"]
 run = "bundle exec ruby main.rb"
+
+[tasks.test]
+description = "Run Ruby tests"
+depends = ["deps"]
+run = "bundle exec rspec spec/"

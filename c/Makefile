@@ -19,20 +19,30 @@ else
 endif
 
 TARGET = trades
+TEST_TARGET = xtdb_test
 SOURCES = trades.c
+TEST_SOURCES = xtdb_test.c
 OBJECTS = $(SOURCES:.c=.o)
+TEST_OBJECTS = $(TEST_SOURCES:.c=.o)
+
 all: $(TARGET)
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) $(PG_LDFLAGS) -o $(TARGET)
+
+$(TEST_TARGET): $(TEST_OBJECTS)
+	$(CC) $(TEST_OBJECTS) $(PG_LDFLAGS) -o $(TEST_TARGET)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(PG_CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(OBJECTS) $(TARGET) $(TEST_OBJECTS) $(TEST_TARGET)
 
 run: $(TARGET)
 	./$(TARGET)
+
+test: $(TEST_TARGET)
+	./$(TEST_TARGET)
 
 debug:
 	@echo "PostgreSQL CFLAGS: $(PG_CFLAGS)"
@@ -42,4 +52,4 @@ debug:
 	@echo "pg_config path: $(PG_CONFIG)"
 	@echo "pkg-config path: $(PKG_CONFIG)"
 
-.PHONY: all clean run debug help
+.PHONY: all clean run test debug help
