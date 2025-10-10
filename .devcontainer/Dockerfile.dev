@@ -1,36 +1,24 @@
 # Dockerfile
 FROM archlinux:base
 
-# Update system and install essential packages
-RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm \
-    curl \
-    ca-certificates \
-    rlwrap \
-    sudo \
-    fish \
-    vi \
-    git \
-    && pacman -Scc --noconfirm
+# Copy and run shared dependency installation script
+COPY install-system-deps.sh /tmp/install-system-deps.sh
+RUN chmod +x /tmp/install-system-deps.sh && \
+    /tmp/install-system-deps.sh all && \
+    rm /tmp/install-system-deps.sh
 
 # Create codespace user
 RUN useradd -m -s /bin/bash -u 1000 codespace && \
     echo "codespace ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Install mise for the codespace user
+# Install and configure mise for the codespace user
 USER codespace
 WORKDIR /home/codespace
 
-RUN curl https://mise.run | sh && \
-    echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc && \
-    echo 'eval "$(~/.local/bin/mise activate bash --shims)"' >> ~/.bashrc && \
-    mkdir -p ~/.config/fish && \
-    echo '~/.local/bin/mise activate fish | source' >> ~/.config/fish/config.fish
-
-# Configure mise to automatically trust the workspace directory
-RUN mkdir -p ~/.config/mise && \
-    echo '[settings]' > ~/.config/mise/config.toml && \
-    echo 'trusted_config_paths = ["/workspaces/driver-examples"]' >> ~/.config/mise/config.toml
+COPY --chown=codespace:codespace setup-mise.sh /tmp/setup-mise.sh
+RUN chmod +x /tmp/setup-mise.sh && \
+    /tmp/setup-mise.sh codespace /workspaces/driver-examples && \
+    rm /tmp/setup-mise.sh
 
 # Add mise to PATH for current session
 ENV PATH="/home/codespace/.local/bin:${PATH}"
@@ -42,6 +30,12 @@ COPY --chown=codespace:codespace .tool-versions /tmp/.tool-versions
 RUN cd /tmp && \
     ~/.local/bin/mise install && \
     rm /tmp/.tool-versions
+
+# Install language-specific tools (Clojure, Elixir, PHP Composer)
+COPY --chown=codespace:codespace setup-language-tools.sh /tmp/setup-language-tools.sh
+RUN chmod +x /tmp/setup-language-tools.sh && \
+    /tmp/setup-language-tools.sh all && \
+    rm /tmp/setup-language-tools.sh
 
 # Set the working directory
 WORKDIR /workspaces/driver-examples

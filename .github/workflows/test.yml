@@ -1,17 +1,20 @@
-name: Verify XTDB Sample Data
+name: Test All Languages
 
 on:
   push:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     services:
       xtdb:
-        image: ghcr.io/xtdb/xtdb:2.0.0
+        image: ghcr.io/xtdb/xtdb:edge
         ports:
           - 5432:5432
           - 8080:8080
@@ -21,28 +24,72 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    container:
+      image: archlinux:base
+      options: --user root
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
+      - name: Install Essential System Dependencies
+        run: |
+          chmod +x $GITHUB_WORKSPACE/.devcontainer/install-system-deps.sh
+          $GITHUB_WORKSPACE/.devcontainer/install-system-deps.sh essential
 
-      - name: Install Clojure CLI
-        uses: DeLaGuardo/setup-clojure@11.0
-        with:
-          cli: latest
+      - name: Create Test User
+        run: |
+          useradd -m -s /bin/bash -u 1001 runner
+          echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-      - name: Add XTDB Hostname to /etc/hosts
-        run: echo "127.0.0.1 xtdb" | sudo tee -a /etc/hosts
+      - name: Install and configure mise
+        run: |
+          cp $GITHUB_WORKSPACE/.devcontainer/setup-mise.sh /tmp/setup-mise.sh
+          chmod +x /tmp/setup-mise.sh
+          su - runner -c "/tmp/setup-mise.sh runner $GITHUB_WORKSPACE"
+          rm /tmp/setup-mise.sh
+
+      - name: Install Language Runtimes
+        run: |
+          chown -R runner:runner $GITHUB_WORKSPACE
+          su - runner -c "cd $GITHUB_WORKSPACE && ~/.local/bin/mise install"
+
+      - name: Install Language-Specific Tools
+        run: |
+          su - runner -c "cd $GITHUB_WORKSPACE && for dir in python csharp babashka; do
+            if [ -d \"\$dir\" ] && [ -f \"\$dir/.mise.toml\" ]; then
+              echo \"Installing mise tools for \$dir...\"
+              (cd \"\$dir\" && ~/.local/bin/mise install) || echo \"Warning: Failed to install tools for \$dir\"
+            fi
+          done"
+
+      - name: Setup Language Runtime Packages
+        run: |
+          # Install system packages for Ruby, Elixir, PHP
+          $GITHUB_WORKSPACE/.devcontainer/install-system-deps.sh languages
+
+      - name: Setup Language Tools (Clojure, Elixir, PHP)
+        run: |
+          cp $GITHUB_WORKSPACE/.devcontainer/setup-language-tools.sh /tmp/setup-language-tools.sh
+          chmod +x /tmp/setup-language-tools.sh
+          su - runner -c "/tmp/setup-language-tools.sh all"
+          rm /tmp/setup-language-tools.sh
+
+      - name: Install Language Dependencies
+        run: |
+          su - runner -c "cd $GITHUB_WORKSPACE && \
+            eval \"\$(~/.local/bin/mise activate bash)\" && \
+            for dir in python node ruby go elixir php; do
+              if [ -d \"\$dir\" ]; then
+                echo \"Installing dependencies for \$dir...\"
+                (cd \"\$dir\" && ~/.local/bin/mise run deps 2>&1) || echo \"Warning: Failed to install deps for \$dir\"
+              fi
+            done"
 
       - name: Wait for XTDB to be Ready
         run: |
           for i in {1..60}; do
-            if curl --silent --fail http://localhost:8080/healthz/alive; then
+            if curl --silent --fail http://xtdb:8080/healthz/alive; then
               echo "XTDB is ready"
               exit 0
             fi
@@ -50,8 +97,30 @@ jobs:
           done
           echo "XTDB did not start in time" && exit 1
 
-      - name: Run Data Load Script
-        run: cd clojure; clojure -M -m load-data ../sample-datasets/sakila/tsv
+      - name: Verify XTDB Connection
+        run: |
+          $GITHUB_WORKSPACE/.devcontainer/install-system-deps.sh postgres
+          su - runner -c "psql -h xtdb -U xtdb -d xtdb -c 'SELECT 1'" || echo "PostgreSQL connection test failed"
+        env:
+          PGPASSWORD: xtdb
 
-      - name: Verify Inserted Data
-        run: cd clojure; clojure -M -m verify-data
+      - name: Run All Tests
+        run: |
+          su - runner -c "cd $GITHUB_WORKSPACE && \
+            export XTDB_HOST=xtdb && \
+            export XTDB_PORT=5432 && \
+            export XTDB_USER=xtdb && \
+            export XTDB_PASSWORD=xtdb && \
+            export XTDB_DATABASE=xtdb && \
+            eval \"\$(~/.local/bin/mise activate bash)\" && \
+            ~/.local/bin/mise run test:all"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            **/test-results/
+            **/coverage/
+          retention-days: 7

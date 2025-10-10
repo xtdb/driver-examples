@@ -1,6 +1,6 @@
 # Tool versions for mise/asdf compatibility
 # This file is automatically read by mise
-python 3.12
+# python managed by system package manager (pacman)
 node lts
 go 1.23
 java 21

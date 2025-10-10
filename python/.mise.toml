@@ -1,19 +1,21 @@
-[tools]
-python = "3.12"
-
 [tasks.default]
 depends = ["run"]
 
 [tasks.deps]
 description = "Install Python dependencies"
-run = "pip install -r requirements.txt"
+run = """
+if [ ! -d "venv" ]; then
+  python -m venv venv
+fi
+source venv/bin/activate && pip install -q -r requirements.txt
+"""
 
 [tasks.run]
 description = "Run Python example"
 depends = ["deps"]
-run = "python main.py"
+run = "source venv/bin/activate && python main.py"
 
 [tasks.test]
 description = "Run Python tests"
 depends = ["deps"]
-run = "pytest -v tests/"
+run = "source venv/bin/activate && pytest -v tests/"

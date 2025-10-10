@@ -199,6 +199,11 @@ echo "Test suite complete"
 echo "Languages passed: $TOTAL_PASSED/12"
 echo "Languages failed: $TOTAL_FAILED/12"
 echo "==========================================="
+
+# Exit with non-zero if any tests failed
+if [ $TOTAL_FAILED -gt 0 ]; then
+  exit 1
+fi
 """
 
 # [env] section removed - was causing mise to look for java plugin

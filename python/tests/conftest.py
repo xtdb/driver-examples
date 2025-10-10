@@ -13,7 +13,9 @@ DB_PARAMS = {
 async def conn():
     """Create a database connection for testing."""
     connection = await pg.AsyncConnection.connect(**DB_PARAMS, autocommit=True)
+    # Register dumpers with proper type hints for XTDB
     connection.adapters.register_dumper(str, pg.types.string.StrDumperVarchar)
+    connection.adapters.register_dumper(int, pg.types.numeric.IntDumper)
     yield connection
     await connection.close()
 
