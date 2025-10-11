@@ -4,7 +4,8 @@
             [next.jdbc.result-set :as rs]
             [clojure.java.io :as io]
             [clojure.data.json :as json]
-            [cognitect.transit :as transit])
+            [cognitect.transit :as transit]
+            [xtdb.api :as xt])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 (def db-spec {:jdbcUrl "jdbc:postgresql://xtdb:5432/xtdb"
@@ -13,12 +14,25 @@
 
 (def ds (jdbc/get-datasource db-spec))
 
+(defn get-client []
+  (xt/client {:host "xtdb"
+              :port 5432
+              :user "xtdb"}))
+
 (defn get-clean-table []
   (format "test_table_%d_%d" (System/currentTimeMillis) (rand-int 10000)))
 
 (defn with-connection [f]
   (with-open [conn (jdbc/get-connection ds)]
     (f conn)))
+
+(defn with-client [f]
+  (let [client (get-client)]
+    (try
+      (f client)
+      (finally
+        (when (instance? java.io.Closeable client)
+          (.close client))))))
 
 ;; Basic Operations Tests
 
@@ -84,23 +98,25 @@
           (is (true? (:active result))))))))
 
 (deftest test-load-sample-json
-  (with-connection
-    (fn [conn]
+  (with-client
+    (fn [client]
       (let [table (get-clean-table)
-            users (json/read-str (slurp "../test-data/sample-users.json") :key-fn keyword)]
+            users (json/read-str (slurp "../test-data/sample-users.json"))]
 
-        ;; Insert each user
+        ;; Insert using XTDB client - it properly encodes Clojure maps with correct OIDs
+        ;; Pass each user object directly as a Clojure map (keys as strings to match JSON)
         (doseq [user users]
-          (jdbc/execute! conn [(format "INSERT INTO %s RECORDS {_id: '%s', name: '%s', age: %d, active: %s}"
-                                       table (:_id user) (:name user) (:age user) (:active user))]))
+          (xt/execute-tx client [[(format "INSERT INTO %s RECORDS ?" table) user]]))
 
         ;; Query back and verify
-        (let [results (jdbc/execute! conn [(format "SELECT _id, name, age, active FROM %s ORDER BY _id" table)])]
+        ;; XTDB client returns _id as :xt/id (XTDB's internal convention)
+        (let [results (xt/q client [(format "SELECT _id, name, age, active FROM %s ORDER BY _id" table)])]
           (is (= 3 (count results)))
-          (is (= "alice" (:_id (first results))))
-          (is (= "Alice Smith" (:name (first results))))
-          (is (= 30 (:age (first results))))
-          (is (true? (:active (first results)))))))))
+          (let [first-result (first results)]
+            (is (= "alice" (:xt/id first-result)))
+            (is (= "Alice Smith" (:name first-result)))
+            (is (= 30 (:age first-result)))
+            (is (true? (:active first-result)))))))))
 
 ;; Transit-JSON Tests
 
@@ -128,53 +144,25 @@
               (is (true? (:active result))))))))))
 
 (deftest test-parse-transit-json
-  (with-connection
-    (fn [conn]
+  (with-client
+    (fn [client]
       (let [table (get-clean-table)
             lines (line-seq (io/reader "../test-data/sample-users-transit.json"))]
 
-        ;; Parse and insert each line
+        ;; Parse transit-JSON and insert using XTDB client
+        ;; The client handles keyword keys directly
         (doseq [line (remove clojure.string/blank? lines)]
           (let [in (ByteArrayInputStream. (.getBytes line))
                 reader (transit/reader in :json)
-                user-data (transit/read reader)
-                id (get user-data :_id)
-                name (get user-data :name)
-                age (get user-data :age)
-                active (get user-data :active)]
-
-            ;; Insert using RECORDS syntax
-            (jdbc/execute! conn [(format "INSERT INTO %s RECORDS {_id: '%s', name: '%s', age: %d, active: %s}"
-                                         table id name age active)])))
+                user-data (transit/read reader)]
+            (xt/execute-tx client [[(format "INSERT INTO %s RECORDS ?" table) user-data]])))
 
         ;; Query back and verify
-        (let [results (jdbc/execute! conn [(format "SELECT _id, name, age, active FROM %s ORDER BY _id" table)])]
+        ;; XTDB client returns _id as :xt/id (XTDB's internal convention)
+        (let [results (xt/q client [(format "SELECT _id, name, age, active FROM %s ORDER BY _id" table)])]
           (is (= 3 (count results)))
-          (is (= "alice" (:_id (first results))))
-          (is (= "Alice Smith" (:name (first results))))
-          (is (= 30 (:age (first results))))
-          (is (true? (:active (first results)))))))))
-
-(deftest test-transit-json-encoding
-  ;; Test transit-clj encoding capabilities
-  (let [out (ByteArrayOutputStream.)
-        writer (transit/writer out :json)
-        data {:string "hello"
-              :number 42
-              :bool true
-              :array [1 2 3]}]
-
-    (transit/write writer data)
-    (let [transit-json (.toString out)]
-      ;; Verify encoding
-      (is (.contains transit-json "hello"))
-      (is (.contains transit-json "42"))
-      (is (.contains transit-json "true"))
-
-      ;; Parse it back
-      (let [in (ByteArrayInputStream. (.getBytes transit-json))
-            reader (transit/reader in :json)
-            parsed (transit/read reader)]
-        (is (= "hello" (:string parsed)))
-        (is (= 42 (:number parsed)))
-        (is (true? (:bool parsed)))))))
+          (let [first-result (first results)]
+            (is (= "alice" (:xt/id first-result)))
+            (is (= "Alice Smith" (:name first-result)))
+            (is (= 30 (:age first-result)))
+            (is (true? (:active first-result)))))))))

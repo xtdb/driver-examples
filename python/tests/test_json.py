@@ -1,6 +1,21 @@
 import pytest
 import json
 from psycopg.types.json import Json
+from psycopg.adapt import Dumper
+from psycopg.pq import Format
+
+
+# Custom dumper for JSON that uses OID 114
+class JsonOidDumper(Dumper):
+    format = Format.TEXT
+    oid = 114  # JSON OID
+
+    def dump(self, obj):
+        # obj should be a JSON string
+        if isinstance(obj, str):
+            return obj.encode('utf-8')
+        else:
+            return json.dumps(obj).encode('utf-8')
 
 @pytest.mark.asyncio
 async def test_json_roundtrip(conn, clean_table):
@@ -68,7 +83,7 @@ async def test_load_sample_data(conn):
 
 @pytest.mark.asyncio
 async def test_json_records_syntax(conn, clean_table):
-    """Test RECORDS syntax with JSON objects (similar to Node.js pattern)."""
+    """Test RECORDS syntax with JSON OID (114) - passing JSON objects directly."""
     import os
 
     table = clean_table
@@ -77,19 +92,17 @@ async def test_json_records_syntax(conn, clean_table):
     with open(test_data_path) as f:
         users = json.load(f)
 
-    # Insert using RECORDS syntax with JSON-encoded strings
-    # Note: psycopg doesn't have sql.types.json() like postgres.js
-    # We build the RECORDS syntax manually with JSON-encoded values
+    # Register JSON dumper for dict type
+    conn.adapters.register_dumper(dict, JsonOidDumper)
+
+    # Insert using JSON OID (114) with single parameter per record
+    # Pass each user object directly without enumerating fields
     for user in users:
-        # Build RECORDS clause with properly formatted JSON
-        record_str = f"""{{
-            _id: '{user["_id"]}',
-            name: '{user["name"]}',
-            age: {user["age"]},
-            email: '{user["email"]}',
-            active: {str(user["active"]).lower()}
-        }}"""
-        await conn.execute(f"INSERT INTO {table} RECORDS {record_str}")
+        # Use INSERT INTO table RECORDS $1 where $1 is sent with OID 114
+        await conn.execute(
+            f"INSERT INTO {table} RECORDS %s",
+            (user,)
+        )
 
     # Query back
     cursor = await conn.execute(f"SELECT _id, name, age, active FROM {table} ORDER BY _id")

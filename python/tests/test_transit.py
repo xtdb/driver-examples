@@ -7,6 +7,18 @@ import pytest
 import json
 import re
 from datetime import datetime, date
+from psycopg.adapt import Dumper
+from psycopg.pq import Format
+
+
+# Custom dumper for transit-JSON that uses OID 16384
+class TransitDumper(Dumper):
+    format = Format.TEXT
+    oid = 16384  # Transit-JSON OID
+
+    def dump(self, obj):
+        # obj should be a transit-JSON string
+        return obj.encode('utf-8')
 
 
 class MinimalTransitEncoder:
@@ -99,32 +111,29 @@ async def test_transit_json_format(conn, clean_table):
 
 @pytest.mark.asyncio
 async def test_transit_json_parsing(conn, clean_table):
-    """Test parsing sample-users-transit.json file."""
+    """Test parsing sample-users-transit.json file using transit OID (16384)."""
     import os
 
     table = clean_table
     test_data_path = os.path.join(os.path.dirname(__file__), "../../test-data/sample-users-transit.json")
 
+    # Register transit dumper for string type
+    conn.adapters.register_dumper(str, TransitDumper)
+
     with open(test_data_path) as f:
         lines = f.readlines()
 
-    # Parse transit-JSON lines and insert using RECORDS curly brace syntax
+    # Insert using transit-JSON OID (16384) with single parameter per record
+    # Pass the raw transit-JSON string directly without unmarshalling
     for line in lines:
         line = line.strip()
         if not line:
             continue
 
-        # Decode transit to Python dict
-        user_data = MinimalTransitEncoder.decode_transit_line(line)
-
-        # Insert using RECORDS curly brace format (not transit array format)
+        # Use INSERT INTO table RECORDS $1 where $1 is sent with OID 16384
         await conn.execute(
-            f"""INSERT INTO {table} RECORDS {{
-                _id: '{user_data["_id"]}',
-                name: '{user_data["name"]}',
-                age: {user_data.get("age", 0)},
-                active: {str(user_data.get("active", False)).lower()}
-            }}"""
+            f"INSERT INTO {table} RECORDS %s",
+            (line,)
         )
 
     # Query back and verify
