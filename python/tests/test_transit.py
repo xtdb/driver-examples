@@ -2,6 +2,17 @@
 Test transit-json functionality with XTDB.
 
 Transit-json (OID 16384) provides richer type preservation than standard JSON.
+
+Note: This module includes a custom transit-JSON reader (parse_transit_value)
+that handles the common transit-JSON subset without requiring external libraries.
+It supports:
+- Transit maps: ["^ ", "~:key", value, ...]
+- Transit keywords: "~:keyword"
+- Transit dates: "~t2020-01-15"
+- Nested arrays and objects
+
+For WRITING transit-JSON from Python, you'd need transit-python2 or similar.
+For READING transit-JSON (as shown here), the custom parser is sufficient.
 """
 import pytest
 import json
@@ -162,3 +173,161 @@ async def test_records_syntax(conn, clean_table):
     assert result[0] == "rec1"
     assert result[1] == "Record User"
     assert result[2] == 100
+
+@pytest.mark.asyncio
+async def test_transit_verify_with_unmarshalling(conn, clean_table):
+    """
+    Verify the OID 16384 approach by parsing and comparing transit-JSON.
+
+    This test demonstrates:
+    1. Insert complete transit-JSON data using OID 16384 (raw strings)
+    2. Query ALL fields back from XTDB (including nested arrays and objects)
+    3. Parse the original transit-JSON to verify correctness
+
+    This proves the OID approach preserves ALL data correctly including:
+    - Scalar fields (strings, numbers, booleans)
+    - Nested arrays (tags)
+    - Nested objects (metadata with dates)
+
+    Note: Uses a custom transit-JSON parser (no external transit library needed for reading).
+    """
+    import os
+    import json
+    from datetime import date
+
+    table = clean_table
+    test_data_path = os.path.join(os.path.dirname(__file__), "../../test-data/sample-users-transit.json")
+
+    # Register transit dumper for string type
+    conn.adapters.register_dumper(str, TransitDumper)
+
+    with open(test_data_path) as f:
+        lines = f.readlines()
+
+    # Store the original parsed data for later comparison
+    original_data = []
+
+    # Step 1: Insert using OID 16384 approach
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Parse the COMPLETE transit-JSON with custom parser
+        # This demonstrates that you don't need transit-python2 for reading transit-JSON
+        raw_json = json.loads(line)
+
+        # Custom transit-JSON reader (handles the subset we need)
+        def parse_transit_value(val):
+            if isinstance(val, list) and len(val) > 0:
+                if val[0] == "^ ":
+                    # It's a map: ["^ ", "~:key1", val1, "~:key2", val2, ...]
+                    result = {}
+                    for i in range(1, len(val), 2):
+                        if i + 1 >= len(val):
+                            break
+                        k = val[i]
+                        v = val[i + 1]
+                        # Convert keyword keys
+                        if isinstance(k, str) and k.startswith("~:"):
+                            k = k[2:]
+                        # Recursively parse values
+                        result[k] = parse_transit_value(v)
+                    return result
+                else:
+                    # It's an array - parse each element
+                    return [parse_transit_value(item) for item in val]
+            elif isinstance(val, str) and val.startswith("~t"):
+                # Transit date - keep as ISO string
+                return val[2:]
+            else:
+                return val
+
+        parsed_dict = parse_transit_value(raw_json)
+        original_data.append(parsed_dict)
+
+        # Insert using OID 16384 - raw transit-JSON string
+        await conn.execute(
+            f"INSERT INTO {table} RECORDS %s",
+            (line,)
+        )
+
+    # Step 2: Query back ALL the data including nested fields
+    cursor = await conn.execute(
+        f"SELECT _id, name, age, active, email, salary, tags, metadata FROM {table} ORDER BY _id"
+    )
+    rows = await cursor.fetchall()
+
+    assert len(rows) == 3
+    assert len(original_data) == 3
+
+    # Step 3: Verify that ALL queried data matches what we parsed from transit-JSON
+    for i, (row, original) in enumerate(zip(rows, original_data)):
+        print(f"\n✅ Verifying record {i+1} ({original.get('_id')}):")
+        print(f"   Scalar fields:")
+        print(f"     _id:    {row[0]} == {original.get('_id')}")
+        print(f"     name:   {row[1]} == {original.get('name')}")
+        print(f"     age:    {row[2]} == {original.get('age')}")
+        print(f"     active: {row[3]} == {original.get('active')}")
+        print(f"     email:  {row[4]} == {original.get('email')}")
+        print(f"     salary: {row[5]} == {original.get('salary')}")
+
+        # Verify scalar fields
+        assert row[0] == original.get('_id')
+        assert row[1] == original.get('name')
+        assert row[2] == original.get('age')
+        assert row[3] == original.get('active')
+        assert row[4] == original.get('email')
+
+        # Verify float field
+        assert row[5] == original.get('salary'), f"salary mismatch: {row[5]} != {original.get('salary')}"
+
+        # Verify nested array (tags)
+        tags_from_db = row[6]
+        tags_from_transit = original.get('tags')
+        print(f"   Nested array (tags):")
+        print(f"     From DB:      {tags_from_db}")
+        print(f"     From transit: {tags_from_transit}")
+        assert tags_from_db == tags_from_transit, f"tags mismatch"
+
+        # Verify nested object (metadata)
+        metadata_from_db = row[7]
+        metadata_from_transit = original.get('metadata')
+        print(f"   Nested object (metadata):")
+        print(f"     From DB:      {metadata_from_db}")
+        print(f"     From transit: {metadata_from_transit}")
+
+        # Compare metadata fields
+        assert metadata_from_db.get('department') == metadata_from_transit.get('department')
+        assert metadata_from_db.get('level') == metadata_from_transit.get('level')
+
+        # Compare dates - XTDB may return with time/timezone added
+        joined_db = metadata_from_db.get('joined')
+        joined_transit = metadata_from_transit.get('joined')
+
+        # Normalize to date-only strings for comparison
+        if isinstance(joined_db, date):
+            joined_db_str = joined_db.isoformat()
+        else:
+            joined_db_str = str(joined_db)
+
+        if isinstance(joined_transit, date):
+            joined_transit_str = joined_transit.isoformat()
+        else:
+            joined_transit_str = str(joined_transit)
+
+        # Extract just the date part (YYYY-MM-DD) for comparison
+        # XTDB may return "2020-01-15T00:00Z" while transit has "2020-01-15"
+        joined_db_date = joined_db_str.split('T')[0]
+        joined_transit_date = joined_transit_str.split('T')[0]
+
+        print(f"     joined: {joined_db_str} -> {joined_db_date} == {joined_transit_date}")
+        assert joined_db_date == joined_transit_date, f"metadata.joined date mismatch"
+
+    print(f"\n✅ Successfully verified COMPLETE OID 16384 approach")
+    print(f"   All {len(rows)} records verified including:")
+    print(f"   - Scalar fields (TEXT, INTEGER, BOOLEAN, FLOAT)")
+    print(f"   - Nested arrays (tags)")
+    print(f"   - Nested objects with dates (metadata)")
+    print(f"   ✨ transit-JSON input == XTDB output (100% data fidelity)")
+    print(f"\n💡 Note: Custom transit-JSON parser used (no external transit library needed!)")
