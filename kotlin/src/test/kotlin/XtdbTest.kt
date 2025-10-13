@@ -6,8 +6,10 @@ import java.io.ByteArrayOutputStream
 import java.io.ByteArrayInputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
 import com.cognitect.transit.TransitFactory
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.postgresql.util.PGobject
 import kotlin.random.Random
 
 class XtdbTest {
@@ -15,7 +17,7 @@ class XtdbTest {
     private lateinit var connection: Connection
 
     companion object {
-        private const val DB_URL = "jdbc:postgresql://xtdb:5432/xtdb"
+        private const val DB_URL = "jdbc:xtdb://xtdb:5432/xtdb"
         private const val DB_USER = "xtdb"
         private const val DB_PASS = ""
     }
@@ -148,27 +150,49 @@ class XtdbTest {
         val jsonPath = "../test-data/sample-users.json"
         val users = mapper.readValue(File(jsonPath), List::class.java) as List<Map<String, Any>>
 
-        // Insert each user
-        connection.createStatement().use { stmt ->
+        // Insert using JSON OID (114) with single parameter per record
+        // Use PGobject to specify the type as 'json'
+        connection.prepareStatement("INSERT INTO $table RECORDS ?").use { pstmt ->
             for (user in users) {
-                val id = user["_id"] as String
-                val name = user["name"] as String
-                val age = (user["age"] as Number).toInt()
-                val active = user["active"] as Boolean
+                val userJSON = mapper.writeValueAsString(user)
 
-                stmt.execute(
-                    "INSERT INTO $table RECORDS {_id: '$id', name: '$name', age: $age, active: $active}"
-                )
+                val jsonObject = PGobject()
+                jsonObject.type = "json"
+                jsonObject.value = userJSON
+
+                pstmt.setObject(1, jsonObject)
+                pstmt.execute()
             }
+        }
 
-            // Query back and verify
-            stmt.executeQuery("SELECT _id, name, age, active FROM $table ORDER BY _id").use { rs ->
+        // Query back and verify - get ALL columns including nested data
+        connection.createStatement().use { stmt ->
+            stmt.executeQuery("SELECT * FROM $table ORDER BY _id").use { rs ->
+                // Verify first record (alice)
                 assertTrue(rs.next())
                 assertEquals("alice", rs.getString("_id"))
                 assertEquals("Alice Smith", rs.getString("name"))
                 assertEquals(30, rs.getInt("age"))
                 assertTrue(rs.getBoolean("active"))
+                assertEquals("alice@example.com", rs.getString("email"))
 
+                // Verify salary (float field)
+                assertEquals(125000.5, rs.getDouble("salary"), 0.01)
+
+                // Verify nested array (tags)
+                val tagsArray = rs.getArray("tags")
+                assertNotNull(tagsArray)
+                val tags = tagsArray.array as Array<*>
+                assertEquals(2, tags.size)
+                assertEquals("admin", tags[0])
+                assertEquals("developer", tags[1])
+
+                // Verify nested object (metadata) exists
+                val metadata = rs.getObject("metadata")
+                assertNotNull(metadata)
+                println("✅ Alice record verified with all fields including nested data")
+
+                // Count all records
                 var count = 1
                 while (rs.next()) {
                     count++
@@ -227,41 +251,49 @@ class XtdbTest {
         val transitPath = "../test-data/sample-users-transit.json"
         val lines = File(transitPath).readLines()
 
-        connection.createStatement().use { stmt ->
+        // Insert using transit OID (16384) with single parameter per record
+        // Use PGobject to specify the type as 'transit'
+        connection.prepareStatement("INSERT INTO $table RECORDS ?").use { pstmt ->
             for (line in lines) {
                 if (line.trim().isEmpty()) continue
 
-                // Parse transit-JSON
-                val input = ByteArrayInputStream(line.toByteArray())
-                val reader = TransitFactory.reader(TransitFactory.Format.JSON, input)
-                @Suppress("UNCHECKED_CAST")
-                val userData = reader.read() as Map<Any, Any>
+                val transitObject = PGobject()
+                transitObject.type = "transit"
+                transitObject.value = line.trim()
 
-                // Extract values (keywords are returned as Keyword objects)
-                val id = userData[TransitFactory.keyword("_id")].toString()
-                val name = userData[TransitFactory.keyword("name")].toString()
-                val ageObj = userData[TransitFactory.keyword("age")]
-                val age = when (ageObj) {
-                    is Long -> ageObj.toInt()
-                    is Int -> ageObj
-                    else -> (ageObj as Number).toInt()
-                }
-                val active = userData[TransitFactory.keyword("active")] as Boolean
-
-                // Insert using RECORDS syntax
-                stmt.execute(
-                    "INSERT INTO $table RECORDS {_id: '$id', name: '$name', age: $age, active: $active}"
-                )
+                pstmt.setObject(1, transitObject)
+                pstmt.execute()
             }
+        }
 
-            // Query back and verify
-            stmt.executeQuery("SELECT _id, name, age, active FROM $table ORDER BY _id").use { rs ->
+        // Query back and verify - get ALL columns including nested data
+        connection.createStatement().use { stmt ->
+            stmt.executeQuery("SELECT * FROM $table ORDER BY _id").use { rs ->
+                // Verify first record (alice)
                 assertTrue(rs.next())
                 assertEquals("alice", rs.getString("_id"))
                 assertEquals("Alice Smith", rs.getString("name"))
                 assertEquals(30, rs.getInt("age"))
                 assertTrue(rs.getBoolean("active"))
+                assertEquals("alice@example.com", rs.getString("email"))
 
+                // Verify salary (float field from transit)
+                assertEquals(125000.5, rs.getDouble("salary"), 0.01)
+
+                // Verify nested array (tags)
+                val tagsArray = rs.getArray("tags")
+                assertNotNull(tagsArray)
+                val tags = tagsArray.array as Array<*>
+                assertEquals(2, tags.size)
+                assertEquals("admin", tags[0])
+                assertEquals("developer", tags[1])
+
+                // Verify nested object (metadata) exists
+                val metadata = rs.getObject("metadata")
+                assertNotNull(metadata)
+                println("✅ Alice record verified with all transit fields including nested data")
+
+                // Count all records
                 var count = 1
                 while (rs.next()) {
                     count++

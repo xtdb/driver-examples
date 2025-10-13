@@ -5,13 +5,14 @@ import java.nio.file.*;
 import java.util.*;
 import com.cognitect.transit.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.postgresql.util.PGobject;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class XtdbTest {
 
     private Connection connection;
-    private static final String DB_URL = "jdbc:postgresql://xtdb:5432/xtdb";
+    private static final String DB_URL = "jdbc:xtdb://xtdb:5432/xtdb";
     private static final String DB_USER = "xtdb";
     private static final String DB_PASS = "";
 
@@ -167,36 +168,58 @@ public class XtdbTest {
             List.class
         );
 
-        // Insert each user
-        try (Statement stmt = connection.createStatement()) {
+        // Insert using JSON OID (114) with single parameter per record
+        // Use PGobject to specify the type as 'json'
+        try (PreparedStatement pstmt = connection.prepareStatement(
+            String.format("INSERT INTO %s RECORDS ?", table))) {
+
             for (Map<String, Object> user : users) {
-                String id = (String) user.get("_id");
-                String name = (String) user.get("name");
-                int age = (Integer) user.get("age");
-                boolean active = (Boolean) user.get("active");
+                String userJSON = mapper.writeValueAsString(user);
 
-                stmt.execute(String.format(
-                    "INSERT INTO %s RECORDS {_id: '%s', name: '%s', age: %d, active: %s}",
-                    table, id, name, age, active
-                ));
+                PGobject jsonObject = new PGobject();
+                jsonObject.setType("json");
+                jsonObject.setValue(userJSON);
+
+                pstmt.setObject(1, jsonObject);
+                pstmt.execute();
             }
+        }
 
-            // Query back and verify
-            try (ResultSet rs = stmt.executeQuery(
-                String.format("SELECT _id, name, age, active FROM %s ORDER BY _id", table))) {
+        // Query back and verify - get ALL columns including nested data
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                String.format("SELECT * FROM %s ORDER BY _id", table))) {
 
-                assertTrue(rs.next());
-                assertEquals("alice", rs.getString("_id"));
-                assertEquals("Alice Smith", rs.getString("name"));
-                assertEquals(30, rs.getInt("age"));
-                assertTrue(rs.getBoolean("active"));
+            // Verify first record (alice)
+            assertTrue(rs.next());
+            assertEquals("alice", rs.getString("_id"));
+            assertEquals("Alice Smith", rs.getString("name"));
+            assertEquals(30, rs.getInt("age"));
+            assertTrue(rs.getBoolean("active"));
+            assertEquals("alice@example.com", rs.getString("email"));
 
-                int count = 1;
-                while (rs.next()) {
-                    count++;
-                }
-                assertEquals(3, count);
+            // Verify salary (float field)
+            assertEquals(125000.5, rs.getDouble("salary"), 0.01);
+
+            // Verify nested array (tags)
+            Array tagsArray = rs.getArray("tags");
+            assertNotNull(tagsArray);
+            String[] tags = (String[]) tagsArray.getArray();
+            assertEquals(2, tags.length);
+            assertEquals("admin", tags[0]);
+            assertEquals("developer", tags[1]);
+
+            // Verify nested object (metadata) exists
+            Object metadata = rs.getObject("metadata");
+            assertNotNull(metadata);
+            System.out.println("✅ Alice record verified with all fields including nested data");
+
+            // Count all records
+            int count = 1;
+            while (rs.next()) {
+                count++;
             }
+            assertEquals(3, count);
         }
     }
 
@@ -252,46 +275,59 @@ public class XtdbTest {
         String transitPath = "../test-data/sample-users-transit.json";
         List<String> lines = Files.readAllLines(Paths.get(transitPath));
 
-        try (Statement stmt = connection.createStatement()) {
+        // Insert using transit OID (16384) with single parameter per record
+        // Use PGobject to specify the type as 'transit'
+        try (PreparedStatement pstmt = connection.prepareStatement(
+            String.format("INSERT INTO %s RECORDS ?", table))) {
+
             for (String line : lines) {
                 line = line.trim();
                 if (line.isEmpty()) continue;
 
-                // Parse transit-JSON
-                ByteArrayInputStream in = new ByteArrayInputStream(line.getBytes());
-                com.cognitect.transit.Reader reader = TransitFactory.reader(TransitFactory.Format.JSON, in);
-                Map<Object, Object> userData = (Map<Object, Object>) reader.read();
+                PGobject transitObject = new PGobject();
+                transitObject.setType("transit");
+                transitObject.setValue(line);
 
-                // Extract values (keywords are returned as Keyword objects)
-                String id = userData.get(TransitFactory.keyword("_id")).toString();
-                String name = userData.get(TransitFactory.keyword("name")).toString();
-                Object ageObj = userData.get(TransitFactory.keyword("age"));
-                int age = (ageObj instanceof Long) ? ((Long) ageObj).intValue() : (Integer) ageObj;
-                boolean active = (Boolean) userData.get(TransitFactory.keyword("active"));
-
-                // Insert using RECORDS syntax
-                stmt.execute(String.format(
-                    "INSERT INTO %s RECORDS {_id: '%s', name: '%s', age: %d, active: %s}",
-                    table, id, name, age, active
-                ));
+                pstmt.setObject(1, transitObject);
+                pstmt.execute();
             }
+        }
 
-            // Query back and verify
-            try (ResultSet rs = stmt.executeQuery(
-                String.format("SELECT _id, name, age, active FROM %s ORDER BY _id", table))) {
+        // Query back and verify - get ALL columns including nested data
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                String.format("SELECT * FROM %s ORDER BY _id", table))) {
 
-                assertTrue(rs.next());
-                assertEquals("alice", rs.getString("_id"));
-                assertEquals("Alice Smith", rs.getString("name"));
-                assertEquals(30, rs.getInt("age"));
-                assertTrue(rs.getBoolean("active"));
+            // Verify first record (alice)
+            assertTrue(rs.next());
+            assertEquals("alice", rs.getString("_id"));
+            assertEquals("Alice Smith", rs.getString("name"));
+            assertEquals(30, rs.getInt("age"));
+            assertTrue(rs.getBoolean("active"));
+            assertEquals("alice@example.com", rs.getString("email"));
 
-                int count = 1;
-                while (rs.next()) {
-                    count++;
-                }
-                assertEquals(3, count);
+            // Verify salary (float field from transit)
+            assertEquals(125000.5, rs.getDouble("salary"), 0.01);
+
+            // Verify nested array (tags)
+            Array tagsArray = rs.getArray("tags");
+            assertNotNull(tagsArray);
+            String[] tags = (String[]) tagsArray.getArray();
+            assertEquals(2, tags.length);
+            assertEquals("admin", tags[0]);
+            assertEquals("developer", tags[1]);
+
+            // Verify nested object (metadata) exists
+            Object metadata = rs.getObject("metadata");
+            assertNotNull(metadata);
+            System.out.println("✅ Alice record verified with all transit fields including nested data");
+
+            // Count all records
+            int count = 1;
+            while (rs.next()) {
+                count++;
             }
+            assertEquals(3, count);
         }
     }
 

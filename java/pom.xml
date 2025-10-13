@@ -21,7 +21,14 @@
   </repositories>
 
   <dependencies>
-    <!-- PostgreSQL JDBC Driver -->
+    <!-- XTDB API (includes XTDB JDBC driver) -->
+    <dependency>
+      <groupId>com.xtdb</groupId>
+      <artifactId>xtdb-api</artifactId>
+      <version>${XTDB_VERSION}</version>
+    </dependency>
+
+    <!-- PostgreSQL JDBC Driver (fallback) -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>

@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.9.21"
+    kotlin("jvm") version "2.1.20"
     application
 }
 
@@ -10,7 +10,10 @@ repositories {
 }
 
 dependencies {
-    // PostgreSQL JDBC Driver
+    // XTDB API (includes XTDB JDBC driver)
+    implementation("com.xtdb:xtdb-api:2.x-SNAPSHOT")
+
+    // PostgreSQL JDBC Driver (fallback)
     implementation("org.postgresql:postgresql:42.7.1")
 
     // Transit-Java for transit-JSON support (using same library as Java)
