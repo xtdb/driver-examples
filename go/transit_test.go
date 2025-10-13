@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -96,6 +95,51 @@ func (e *MinimalTransitEncoder) DecodeTransitLine(line string) (map[string]inter
 	return result, nil
 }
 
+func TestSimpleRecordsInsert(t *testing.T) {
+	conn := getConn(t)
+	defer conn.Close(context.Background())
+
+	table := getCleanTable()
+
+	// Demonstrate using low-level PgConn.ExecParams to specify OID explicitly
+	testJSON := `{"_id": "test1", "name": "Test User"}`
+	sql := fmt.Sprintf("INSERT INTO %s RECORDS $1", table)
+
+	// Use low-level ExecParams with explicit OID 114 (JSON)
+	pgconn := conn.PgConn()
+	result := pgconn.ExecParams(context.Background(), sql,
+		[][]byte{[]byte(testJSON)}, // parameter values
+		[]uint32{JSONOID},           // parameter OIDs - OID 114
+		[]int16{0},                  // parameter formats (0 = text)
+		[]int16{0})                  // result formats (0 = text)
+
+	_, err := result.Close()
+	if err != nil {
+		t.Fatalf("Insert failed: %v", err)
+	}
+
+	// Verify the insert worked by querying
+	rows, err := conn.Query(context.Background(),
+		fmt.Sprintf("SELECT _id, name FROM %s", table))
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		t.Fatal("Expected at least one row")
+	}
+
+	var id, name string
+	if err := rows.Scan(&id, &name); err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+
+	if id != "test1" || name != "Test User" {
+		t.Errorf("Got (_id=%s, name=%s), expected (test1, Test User)", id, name)
+	}
+}
+
 func TestTransitJSONFormat(t *testing.T) {
 	conn := getConn(t)
 	defer conn.Close(context.Background())
@@ -158,15 +202,154 @@ func TestTransitJSONParsing(t *testing.T) {
 
 	table := getCleanTable()
 
-	// Load and parse sample-users-transit.json
+	// Load sample-users-transit.json
+	content, err := os.ReadFile("../test-data/sample-users-transit.json")
+	if err != nil {
+		t.Fatalf("Failed to read transit file: %v", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	sql := fmt.Sprintf("INSERT INTO %s RECORDS $1", table)
+
+	// Insert using transit OID (16384) with single parameter per record
+	// Use low-level ExecParams to specify OID explicitly
+	pgconn := conn.PgConn()
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Encode parameter as bytes
+		buf := []byte(line)
+
+		// Use ExecParams with explicit OID 16384 (transit-JSON)
+		result := pgconn.ExecParams(context.Background(), sql,
+			[][]byte{buf},            // parameter values
+			[]uint32{TransitOID},     // parameter OIDs - OID 16384
+			[]int16{0},               // parameter formats (0 = text)
+			[]int16{0})               // result formats (0 = text)
+
+		_, err = result.Close()
+		if err != nil {
+			t.Fatalf("Insert failed: %v", err)
+		}
+	}
+
+	// Query back and verify - get ALL columns including nested data
+	rows, err := conn.Query(context.Background(),
+		fmt.Sprintf("SELECT * FROM %s ORDER BY _id", table))
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	defer rows.Close()
+
+	// Get column names
+	fieldDescs := rows.FieldDescriptions()
+	columnNames := make([]string, len(fieldDescs))
+	for i, fd := range fieldDescs {
+		columnNames[i] = string(fd.Name)
+	}
+
+	count := 0
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			t.Fatalf("Failed to get values: %v", err)
+		}
+
+		// Create a map of column name -> value
+		rowMap := make(map[string]interface{})
+		for i, colName := range columnNames {
+			rowMap[colName] = values[i]
+		}
+
+		count++
+
+		// Verify first record (alice)
+		if count == 1 {
+			if rowMap["_id"] != "alice" {
+				t.Errorf("Expected _id='alice', got %v", rowMap["_id"])
+			}
+			if rowMap["name"] != "Alice Smith" {
+				t.Errorf("Expected name='Alice Smith', got %v", rowMap["name"])
+			}
+			// Age might be int32, int64, or float64 depending on how pgx decodes it
+			ageVal := rowMap["age"]
+			var age int64
+			switch v := ageVal.(type) {
+			case int32:
+				age = int64(v)
+			case int64:
+				age = v
+			case float64:
+				age = int64(v)
+			default:
+				t.Errorf("Expected age to be numeric, got %T: %v", ageVal, ageVal)
+			}
+			if age != 30 {
+				t.Errorf("Expected age=30, got %d", age)
+			}
+			if active, ok := rowMap["active"].(bool); !ok || !active {
+				t.Errorf("Expected active=true, got %v", rowMap["active"])
+			}
+			if rowMap["email"] != "alice@example.com" {
+				t.Errorf("Expected email='alice@example.com', got %v", rowMap["email"])
+			}
+
+			// Verify salary (float field)
+			if salary, ok := rowMap["salary"].(float64); !ok || salary != 125000.5 {
+				t.Errorf("Expected salary=125000.5, got %v", rowMap["salary"])
+			}
+
+			// Verify nested array (tags)
+			if tags, ok := rowMap["tags"].([]interface{}); ok {
+				if len(tags) != 2 {
+					t.Errorf("Expected 2 tags, got %d", len(tags))
+				} else {
+					if tags[0] != "admin" || tags[1] != "developer" {
+						t.Errorf("Expected tags ['admin', 'developer'], got %v", tags)
+					}
+				}
+			} else {
+				t.Errorf("Expected tags to be array, got %T", rowMap["tags"])
+			}
+
+			// Verify nested object (metadata) exists
+			if metadata, ok := rowMap["metadata"].(map[string]interface{}); ok {
+				if metadata == nil {
+					t.Error("Expected metadata to exist")
+				}
+			} else {
+				t.Logf("Metadata is type %T: %v", rowMap["metadata"], rowMap["metadata"])
+			}
+		}
+	}
+
+	if count != 3 {
+		t.Errorf("Expected 3 records, got %d", count)
+	}
+
+	t.Logf("✅ Transit-JSON OID approach working! Inserted and queried %d records with OID 16384", count)
+}
+
+/*
+func TestTransitJSONParsingOriginal(t *testing.T) {
+	// Original test that unmarshalls the transit data:
+	conn := getConn(t)
+	defer conn.Close(context.Background())
+
+	table := getCleanTable()
+
+	// Load sample-users-transit.json
 	file, err := os.Open("../test-data/sample-users-transit.json")
 	if err != nil {
 		t.Fatalf("Failed to open transit file: %v", err)
 	}
 	defer file.Close()
 
-	encoder := &MinimalTransitEncoder{}
 	scanner := bufio.NewScanner(file)
+	encoder := &MinimalTransitEncoder{}
 
 	count := 0
 	for scanner.Scan() {
@@ -236,6 +419,7 @@ func TestTransitJSONParsing(t *testing.T) {
 		t.Errorf("Expected 3 users from query, got %d", verifyCount)
 	}
 }
+*/
 
 func TestTransitJSONWithDate(t *testing.T) {
 	conn := getConn(t)

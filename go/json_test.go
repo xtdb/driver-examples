@@ -60,59 +60,133 @@ func TestJSONLoadSampleData(t *testing.T) {
 	table := getCleanTable()
 
 	// Load sample-users.json
-	data, err := os.ReadFile("../test-data/sample-users.json")
+	content, err := os.ReadFile("../test-data/sample-users.json")
 	if err != nil {
-		t.Fatalf("Failed to read sample data: %v", err)
+		t.Fatalf("Failed to read JSON file: %v", err)
 	}
 
 	var users []map[string]interface{}
-	if err := json.Unmarshal(data, &users); err != nil {
+	if err := json.Unmarshal(content, &users); err != nil {
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
 
-	// Insert each user using RECORDS syntax
-	for _, user := range users {
-		id := user["_id"].(string)
-		name := user["name"].(string)
-		age := int(user["age"].(float64))
-		active := user["active"].(bool)
+	sql := fmt.Sprintf("INSERT INTO %s RECORDS $1", table)
 
-		_, err := conn.Exec(context.Background(),
-			fmt.Sprintf(`INSERT INTO %s RECORDS {_id: '%s', name: '%s', age: %d, active: %v}`,
-				table, id, name, age, active))
+	// Insert using JSON OID (114) with single parameter per record
+	// Use low-level ExecParams to specify OID explicitly
+	pgconn := conn.PgConn()
+	for _, user := range users {
+		userJSON, err := json.Marshal(user)
 		if err != nil {
-			t.Fatalf("Insert failed for user %s: %v", id, err)
+			t.Fatalf("Failed to marshal user: %v", err)
+		}
+
+		// Use ExecParams with explicit OID 114 (JSON)
+		result := pgconn.ExecParams(context.Background(), sql,
+			[][]byte{userJSON},       // parameter values
+			[]uint32{JSONOID},        // parameter OIDs - OID 114
+			[]int16{0},               // parameter formats (0 = text)
+			[]int16{0})               // result formats (0 = text)
+
+		_, err = result.Close()
+		if err != nil {
+			t.Fatalf("Insert failed: %v", err)
 		}
 	}
 
-	// Query back and verify
+	// Query back and verify - get ALL columns including nested data
 	rows, err := conn.Query(context.Background(),
-		fmt.Sprintf("SELECT _id, name, age, active FROM %s ORDER BY _id", table))
+		fmt.Sprintf("SELECT * FROM %s ORDER BY _id", table))
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}
 	defer rows.Close()
 
+	// Get column names
+	fieldDescs := rows.FieldDescriptions()
+	columnNames := make([]string, len(fieldDescs))
+	for i, fd := range fieldDescs {
+		columnNames[i] = string(fd.Name)
+	}
+
 	count := 0
 	for rows.Next() {
-		var id, name string
-		var age int
-		var active bool
-		if err := rows.Scan(&id, &name, &age, &active); err != nil {
-			t.Fatalf("Scan failed: %v", err)
+		values, err := rows.Values()
+		if err != nil {
+			t.Fatalf("Failed to get values: %v", err)
 		}
+
+		// Create a map of column name -> value
+		rowMap := make(map[string]interface{})
+		for i, colName := range columnNames {
+			rowMap[colName] = values[i]
+		}
+
 		count++
 
-		// Verify first user (alice)
+		// Verify first record (alice)
 		if count == 1 {
-			if id != "alice" || name != "Alice Smith" || age != 30 || !active {
-				t.Errorf("First user: expected (alice, Alice Smith, 30, true), got (%s, %s, %d, %v)",
-					id, name, age, active)
+			if rowMap["_id"] != "alice" {
+				t.Errorf("Expected _id='alice', got %v", rowMap["_id"])
+			}
+			if rowMap["name"] != "Alice Smith" {
+				t.Errorf("Expected name='Alice Smith', got %v", rowMap["name"])
+			}
+			// Age might be int32, int64, or float64 depending on how pgx decodes it
+			ageVal := rowMap["age"]
+			var age int64
+			switch v := ageVal.(type) {
+			case int32:
+				age = int64(v)
+			case int64:
+				age = v
+			case float64:
+				age = int64(v)
+			default:
+				t.Errorf("Expected age to be numeric, got %T: %v", ageVal, ageVal)
+			}
+			if age != 30 {
+				t.Errorf("Expected age=30, got %d", age)
+			}
+			if active, ok := rowMap["active"].(bool); !ok || !active {
+				t.Errorf("Expected active=true, got %v", rowMap["active"])
+			}
+			if rowMap["email"] != "alice@example.com" {
+				t.Errorf("Expected email='alice@example.com', got %v", rowMap["email"])
+			}
+
+			// Verify salary (float field)
+			if salary, ok := rowMap["salary"].(float64); !ok || salary != 125000.5 {
+				t.Errorf("Expected salary=125000.5, got %v", rowMap["salary"])
+			}
+
+			// Verify nested array (tags)
+			if tags, ok := rowMap["tags"].([]interface{}); ok {
+				if len(tags) != 2 {
+					t.Errorf("Expected 2 tags, got %d", len(tags))
+				} else {
+					if tags[0] != "admin" || tags[1] != "developer" {
+						t.Errorf("Expected tags ['admin', 'developer'], got %v", tags)
+					}
+				}
+			} else {
+				t.Errorf("Expected tags to be array, got %T", rowMap["tags"])
+			}
+
+			// Verify nested object (metadata) exists
+			if metadata, ok := rowMap["metadata"].(map[string]interface{}); ok {
+				if metadata == nil {
+					t.Error("Expected metadata to exist")
+				}
+			} else {
+				t.Logf("Metadata is type %T: %v", rowMap["metadata"], rowMap["metadata"])
 			}
 		}
 	}
 
 	if count != 3 {
-		t.Errorf("Expected 3 users, got %d", count)
+		t.Errorf("Expected 3 records, got %d", count)
 	}
+
+	t.Logf("✅ JSON OID approach working! Inserted and queried %d records with OID 114", count)
 }
