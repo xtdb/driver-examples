@@ -1,3 +1,3 @@
-["^ ","~:_id","alice","~:name","Alice Smith","~:age",30,"~:email","alice@example.com","~:active",true,"~:tags",["admin","developer"],"~:metadata",["^ ","~:department","Engineering","~:level",5,"~:joined","~t2020-01-15"]]
-["^ ","~:_id","bob","~:name","Bob Jones","~:age",25,"~:email","bob@example.com","~:active",true,"~:tags",["developer"],"~:metadata",["^ ","~:department","Engineering","~:level",3,"~:joined","~t2022-06-01"]]
-["^ ","~:_id","charlie","~:name","Charlie Brown","~:age",35,"~:email","charlie@example.com","~:active",false,"~:tags",["manager"],"~:metadata",["^ ","~:department","Product","~:level",6,"~:joined","~t2019-03-20"]]
+["^ ","~:_id","alice","~:name","Alice Smith","~:age",30,"~:email","alice@example.com","~:active",true,"~:salary",125000.50,"~:tags",["admin","developer"],"~:metadata",["^ ","~:department","Engineering","~:level",5,"~:joined","~t2020-01-15"]]
+["^ ","~:_id","bob","~:name","Bob Jones","~:age",25,"~:email","bob@example.com","~:active",true,"~:salary",85000.75,"~:tags",["developer"],"~:metadata",["^ ","~:department","Engineering","~:level",3,"~:joined","~t2022-06-01"]]
+["^ ","~:_id","charlie","~:name","Charlie Brown","~:age",35,"~:email","charlie@example.com","~:active",false,"~:salary",150000.00,"~:tags",["manager"],"~:metadata",["^ ","~:department","Product","~:level",6,"~:joined","~t2019-03-20"]]

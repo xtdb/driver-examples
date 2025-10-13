@@ -161,20 +161,49 @@ defmodule XTDBTest do
     {:ok, content} = File.read("../test-data/sample-users.json")
     {:ok, users} = Jason.decode(content)
 
-    # Insert each user
+    # Insert using JSON OID (114) with single parameter per record
+    # Using the approach from xtdb_example.ex: prepare, modify param_oids, execute
+    {:ok, query} = Postgrex.prepare(pid, "", "INSERT INTO #{table} RECORDS $1")
+
+    # Manually modify the query to specify OID 114 for JSON
+    modified_query = %{query |
+      param_oids: [114],
+      param_formats: [:text],
+      param_types: [Postgrex.Extensions.Raw]
+    }
+
     for user <- users do
-      Postgrex.query!(
-        pid,
-        "INSERT INTO #{table} RECORDS {_id: '#{user["_id"]}', name: '#{user["name"]}', age: #{user["age"]}, active: #{user["active"]}}",
-        []
-      )
+      user_json = Jason.encode!(user)
+      {:ok, _, _result} = Postgrex.execute(pid, modified_query, [user_json])
     end
 
-    # Query back and verify
-    result = Postgrex.query!(pid, "SELECT _id, name, age, active FROM #{table} ORDER BY _id", [])
+    Postgrex.close(pid, query)
+
+    # Query back and verify - get ALL columns including nested data
+    result = Postgrex.query!(pid, "SELECT * FROM #{table} ORDER BY _id", [])
     assert %Postgrex.Result{rows: rows} = result
     assert length(rows) == 3
-    assert [["alice", "Alice Smith", 30, true] | _] = rows
+
+    # Verify first record (alice)
+    [first_row | _] = rows
+    columns = result.columns
+    row_map = Enum.zip(columns, first_row) |> Map.new()
+
+    assert row_map["_id"] == "alice"
+    assert row_map["name"] == "Alice Smith"
+    assert row_map["age"] == 30
+    assert row_map["active"] == true
+    assert row_map["email"] == "alice@example.com"
+    assert row_map["salary"] == 125000.5
+
+    # Verify nested array (tags)
+    assert is_list(row_map["tags"])
+    assert length(row_map["tags"]) == 2
+    assert "admin" in row_map["tags"]
+    assert "developer" in row_map["tags"]
+
+    # Verify nested object (metadata) exists
+    assert is_map(row_map["metadata"])
 
     GenServer.stop(pid)
   end
@@ -217,32 +246,48 @@ defmodule XTDBTest do
       |> String.split("\n")
       |> Enum.reject(&(&1 == ""))
 
-    # Parse and insert each line
+    # Insert using transit OID (16384) with single parameter per record
+    # Using the approach from xtdb_example.ex: prepare, modify param_oids, execute
+    {:ok, query} = Postgrex.prepare(pid, "", "INSERT INTO #{table} RECORDS $1")
+
+    # Manually modify the query to specify OID 16384 for transit-JSON
+    modified_query = %{query |
+      param_oids: [16384],
+      param_formats: [:text],
+      param_types: [Postgrex.Extensions.Raw]
+    }
+
     for line <- lines do
-      {:ok, user_data} = Jason.decode(line)
-
-      # Extract data from transit format
-      # Transit format: ["^ ", "~:_id", "alice", "~:name", "Alice Smith", ...]
-      ["^ " | pairs] = user_data
-      map_data = Enum.chunk_every(pairs, 2) |> Map.new(fn [k, v] -> {k, v} end)
-
-      id = map_data["~:_id"]
-      name = map_data["~:name"]
-      age = map_data["~:age"]
-      active = map_data["~:active"]
-
-      Postgrex.query!(
-        pid,
-        "INSERT INTO #{table} RECORDS {_id: '#{id}', name: '#{name}', age: #{age}, active: #{active}}",
-        []
-      )
+      {:ok, _, _result} = Postgrex.execute(pid, modified_query, [line])
     end
 
-    # Query back and verify
-    result = Postgrex.query!(pid, "SELECT _id, name, age, active FROM #{table} ORDER BY _id", [])
+    Postgrex.close(pid, query)
+
+    # Query back and verify - get ALL columns including nested data
+    result = Postgrex.query!(pid, "SELECT * FROM #{table} ORDER BY _id", [])
     assert %Postgrex.Result{rows: rows} = result
     assert length(rows) == 3
-    assert [["alice", "Alice Smith", 30, true] | _] = rows
+
+    # Verify first record (alice)
+    [first_row | _] = rows
+    columns = result.columns
+    row_map = Enum.zip(columns, first_row) |> Map.new()
+
+    assert row_map["_id"] == "alice"
+    assert row_map["name"] == "Alice Smith"
+    assert row_map["age"] == 30
+    assert row_map["active"] == true
+    assert row_map["email"] == "alice@example.com"
+    assert row_map["salary"] == 125000.5
+
+    # Verify nested array (tags)
+    assert is_list(row_map["tags"])
+    assert length(row_map["tags"]) == 2
+    assert "admin" in row_map["tags"]
+    assert "developer" in row_map["tags"]
+
+    # Verify nested object (metadata) exists
+    assert is_map(row_map["metadata"])
 
     GenServer.stop(pid)
   end

@@ -5,6 +5,7 @@
     "age": 30,
     "email": "alice@example.com",
     "active": true,
+    "salary": 125000.50,
     "tags": ["admin", "developer"],
     "metadata": {
       "department": "Engineering",
@@ -18,6 +19,7 @@
     "age": 25,
     "email": "bob@example.com",
     "active": true,
+    "salary": 85000.75,
     "tags": ["developer"],
     "metadata": {
       "department": "Engineering",
@@ -31,6 +33,7 @@
     "age": 35,
     "email": "charlie@example.com",
     "active": false,
+    "salary": 150000.00,
     "tags": ["manager"],
     "metadata": {
       "department": "Product",
