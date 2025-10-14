@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>XTDB Transit-JSON plugin for Npgsql, allowing use of transit type (OID 16384)</Description>
+    <!-- Suppress experimental API warnings - the PgTypeInfoResolverFactory API is marked experimental -->
+    <NoWarn>$(NoWarn);NPG9001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

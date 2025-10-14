@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Npgsql;
+using Npgsql.XtdbTransit;
 using NpgsqlTypes;
 using Xunit;
 
@@ -13,7 +14,7 @@ namespace XtdbTests
 {
     public class XtdbTest : IAsyncLifetime
     {
-        private const string ConnectionString = "Host=xtdb;Port=5432;Database=xtdb;Username=xtdb;Password=;";
+        private const string ConnectionString = "Host=xtdb;Port=5432;Database=xtdb;Username=xtdb;Password=;Server Compatibility Mode=NoTypeLoading";
         private NpgsqlDataSource? _dataSource;
 
         public async Task InitializeAsync()
@@ -290,40 +291,74 @@ namespace XtdbTests
             }
         }
 
-        // COMMENTED OUT: Npgsql AddWithValue doesn't support OID specification. See TestLoadSampleJson.
-        [Fact(Skip = "Npgsql AddWithValue doesn't support OID specification")]
+        [Fact(Skip = "Transit OID 16384 not accessible via Npgsql - Npgsql validates DataTypeName before consulting custom resolvers. Blocked by https://github.com/xtdb/xtdb/issues/4421. Use JSON (OID 114) instead.")]
         public async Task TestParseTransitJson()
         {
             var table = GetCleanTable();
-            await using var conn = await _dataSource!.OpenConnectionAsync();
+
+            // Create a transit-enabled data source using the plugin
+            // Note: Connection string uses ServerCompatibilityMode=NoTypeLoading to avoid XTDB's SQL limitations
+            var builder = new NpgsqlDataSourceBuilder(ConnectionString);
+            Npgsql.XtdbTransit.NpgsqlXtdbTransitExtensions.UseTransit(builder);  // Enable transit support via plugin
+            await using var transitDataSource = builder.Build();
+            await using var conn = await transitDataSource.OpenConnectionAsync();
 
             // Load sample-users-transit.json
             var testDataPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "test-data", "sample-users-transit.json");
             var lines = await System.IO.File.ReadAllLinesAsync(testDataPath);
 
-            // Insert using transit OID (16384) with single parameter per record
-            // Pass the raw transit-JSON string without parsing
+            // Insert using transit OID (16384) with DataTypeName
+            // XTDB registers 'transit' in pg_type, so Npgsql can discover it with type loading enabled
             foreach (var line in lines.Where(l => !string.IsNullOrWhiteSpace(l)))
             {
-                await using var cmd = new NpgsqlCommand($"INSERT INTO {table} RECORDS $1", conn);
-                cmd.Parameters.AddWithValue(line.Trim());
+                await using var cmd = new NpgsqlCommand($"INSERT INTO {table} RECORDS @p1", conn);
+                cmd.Parameters.Add(new NpgsqlParameter
+                {
+                    ParameterName = "@p1",
+                    Value = line.Trim(),
+                    DataTypeName = "transit"
+                });
                 await cmd.ExecuteNonQueryAsync();
             }
 
-            // Query back and verify
-            await using (var cmd = new NpgsqlCommand($"SELECT _id, name, age, active FROM {table} ORDER BY _id", conn))
+            // Query back and verify with ALL fields including nested data
+            await using (var cmd = new NpgsqlCommand($"SELECT * FROM {table} ORDER BY _id", conn))
             await using (var reader = await cmd.ExecuteReaderAsync())
             {
                 Assert.True(await reader.ReadAsync());
-                Assert.Equal("alice", reader.GetString(0));
-                Assert.Equal("Alice Smith", reader.GetString(1));
-                Assert.Equal(30, reader.GetInt32(2));
-                Assert.True(reader.GetBoolean(3));
+
+                // Verify first record (alice) with all fields
+                Assert.Equal("alice", reader.GetString(0));  // _id
+                Assert.True(reader.GetBoolean(1));           // active
+                Assert.Equal(30, reader.GetInt32(2));        // age
+                Assert.Equal("alice@example.com", reader.GetString(3)); // email
+
+                // Verify nested object (metadata) - comes back as JSON string
+                var metadataJson = reader.GetString(4);
+                using var metadataDoc = JsonDocument.Parse(metadataJson);
+                var metadata = metadataDoc.RootElement;
+                Assert.Equal("Engineering", metadata.GetProperty("department").GetString());
+                Assert.Equal(5, metadata.GetProperty("level").GetInt32());
+
+                // Verify joined date contains the expected date
+                var joined = metadata.GetProperty("joined").GetString();
+                Assert.Contains("2020-01-15", joined);
+
+                Assert.Equal("Alice Smith", reader.GetString(5)); // name
+                Assert.Equal(125000.5, reader.GetDouble(6));      // salary
+
+                // Verify nested array (tags)
+                var tags = reader.GetFieldValue<string[]>(7);
+                Assert.Equal(2, tags.Length);
+                Assert.Contains("admin", tags);
+                Assert.Contains("developer", tags);
 
                 var count = 1;
                 while (await reader.ReadAsync()) count++;
                 Assert.Equal(3, count);
             }
+
+            Console.WriteLine("✅ Transit plugin successfully enabled OID 16384 support!");
         }
 
         [Fact]

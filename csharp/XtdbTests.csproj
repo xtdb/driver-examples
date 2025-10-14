@@ -4,6 +4,11 @@
     <TargetFramework>net9.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Suppress experimental API warnings - the PgTypeInfoResolverFactory API is marked experimental -->
+    <NoWarn>$(NoWarn);NPG9001</NoWarn>
+    <!-- Disable auto-generation of assembly info to avoid duplicates -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +20,10 @@
     </PackageReference>
     <PackageReference Include="Npgsql" Version="9.0.3" />
     <PackageReference Include="System.Text.Json" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="Npgsql.XtdbTransit\Npgsql.XtdbTransit.csproj" />
   </ItemGroup>
 
 </Project>
