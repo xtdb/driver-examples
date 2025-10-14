@@ -234,6 +234,277 @@ TEST(load_sample_json) {
     PASS();
 }
 
+// OID-based Tests (using PQexecParams with explicit OIDs)
+
+#define TRANSIT_OID 16384
+#define JSON_OID 114
+
+TEST(json_with_oid) {
+    char *table = get_clean_table();
+    char query[512];
+
+    /* Load sample-users.json - need to parse multi-line JSON objects */
+    FILE *fp = fopen("../test-data/sample-users.json", "r");
+    ASSERT(fp != NULL, "Failed to open sample-users.json");
+
+    /* Read entire file into memory */
+    fseek(fp, 0, SEEK_END);
+    long fsize = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    char *file_content = malloc(fsize + 1);
+    fread(file_content, 1, fsize, fp);
+    fclose(fp);
+    file_content[fsize] = '\0';
+
+    /* Parse JSON objects by counting braces */
+    char json_object[8192];
+    int inserted_count = 0;
+    int brace_count = 0;
+    int obj_start = -1;
+    bool in_string = false;
+    bool escape_next = false;
+
+    snprintf(query, sizeof(query), "INSERT INTO %s RECORDS $1", table);
+
+    for (long i = 0; i < fsize; i++) {
+        char c = file_content[i];
+
+        if (escape_next) {
+            escape_next = false;
+            continue;
+        }
+
+        if (c == '\\' && in_string) {
+            escape_next = true;
+            continue;
+        }
+
+        if (c == '"') {
+            in_string = !in_string;
+            continue;
+        }
+
+        if (in_string) continue;
+
+        if (c == '{') {
+            if (brace_count == 0) {
+                obj_start = i;
+            }
+            brace_count++;
+        } else if (c == '}') {
+            brace_count--;
+            if (brace_count == 0 && obj_start >= 0) {
+                /* Found complete JSON object */
+                int obj_len = i - obj_start + 1;
+                strncpy(json_object, file_content + obj_start, obj_len);
+                json_object[obj_len] = '\0';
+
+                /* Insert using JSON OID (114) */
+                const char *paramValues[1] = {json_object};
+                const Oid paramTypes[1] = {JSON_OID};
+
+                PGresult *res = PQexecParams(conn, query, 1, paramTypes, paramValues, NULL, NULL, 0);
+                ASSERT(PQresultStatus(res) == PGRES_COMMAND_OK, "Insert with JSON OID failed");
+                PQclear(res);
+                inserted_count++;
+
+                obj_start = -1;
+            }
+        }
+    }
+
+    free(file_content);
+    ASSERT_EQ_INT(inserted_count, 3, "Expected to insert 3 records");
+
+    /* Verify the data - check first record (alice) with ALL fields including nested data */
+    snprintf(query, sizeof(query),
+             "SELECT _id, name, age, active, email, salary, tags, metadata FROM %s WHERE _id = 'alice'", table);
+    PGresult *res = PQexec(conn, query);
+
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Select failed");
+    ASSERT_EQ_INT(PQntuples(res), 1, "Expected 1 row for alice");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 0), "alice", "_id should be alice");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 1), "Alice Smith", "Name should be Alice Smith");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 2), "30", "Age should be 30");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 3), "t", "Active should be true");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 4), "alice@example.com", "Email should match");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 5), "125000.5", "Salary should be 125000.5");
+
+    /* Verify nested array (tags) - returned as JSON array string */
+    const char *tags = PQgetvalue(res, 0, 6);
+    ASSERT(tags != NULL, "Tags should not be NULL");
+    ASSERT(strstr(tags, "admin") != NULL, "Tags should contain 'admin'");
+    ASSERT(strstr(tags, "developer") != NULL, "Tags should contain 'developer'");
+
+    /* Verify nested object (metadata) - returned as JSON object string */
+    const char *metadata = PQgetvalue(res, 0, 7);
+    ASSERT(metadata != NULL, "Metadata should not be NULL");
+    ASSERT(strstr(metadata, "Engineering") != NULL, "Metadata should contain 'Engineering'");
+    ASSERT(strstr(metadata, "\"level\":5") != NULL || strstr(metadata, "\"level\": 5") != NULL,
+           "Metadata should contain level:5");
+    ASSERT(strstr(metadata, "2020-01-15") != NULL, "Metadata should contain joined date");
+
+    PQclear(res);
+
+    /* Verify total count */
+    snprintf(query, sizeof(query), "SELECT COUNT(*) FROM %s", table);
+    res = PQexec(conn, query);
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Count query failed");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 0), "3", "Should have 3 total records");
+    PQclear(res);
+
+    PASS();
+}
+
+TEST(transit_with_oid) {
+    char *table = get_clean_table();
+    char query[512];
+
+    /* Load sample-users-transit.json - one transit-JSON record per line */
+    FILE *fp = fopen("../test-data/sample-users-transit.json", "r");
+    ASSERT(fp != NULL, "Failed to open sample-users-transit.json");
+
+    char line[4096];
+    int inserted_count = 0;
+
+    snprintf(query, sizeof(query), "INSERT INTO %s RECORDS $1", table);
+
+    while (fgets(line, sizeof(line), fp)) {
+        /* Trim whitespace */
+        char *trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t' || *trimmed == '\n') trimmed++;
+
+        size_t len = strlen(trimmed);
+        while (len > 0 && (trimmed[len-1] == ' ' || trimmed[len-1] == '\n' || trimmed[len-1] == '\r')) {
+            trimmed[--len] = '\0';
+        }
+
+        if (len == 0 || *trimmed == '\0') continue;
+
+        /* Insert using transit-JSON OID (16384) */
+        const char *paramValues[1] = {trimmed};
+        const Oid paramTypes[1] = {TRANSIT_OID};
+
+        PGresult *res = PQexecParams(conn, query, 1, paramTypes, paramValues, NULL, NULL, 0);
+        ASSERT(PQresultStatus(res) == PGRES_COMMAND_OK, "Insert with transit OID failed");
+        PQclear(res);
+        inserted_count++;
+    }
+
+    fclose(fp);
+    ASSERT_EQ_INT(inserted_count, 3, "Expected to insert 3 records");
+
+    /* Verify the data - check first record (alice) with ALL fields including nested data */
+    snprintf(query, sizeof(query),
+             "SELECT _id, name, age, active, email, salary, tags, metadata FROM %s WHERE _id = 'alice'", table);
+    PGresult *res = PQexec(conn, query);
+
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Select failed");
+    ASSERT_EQ_INT(PQntuples(res), 1, "Expected 1 row for alice");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 0), "alice", "_id should be alice");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 1), "Alice Smith", "Name should be Alice Smith");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 2), "30", "Age should be 30");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 3), "t", "Active should be true");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 4), "alice@example.com", "Email should match");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 5), "125000.5", "Salary should be 125000.5");
+
+    /* Verify nested array (tags) - XTDB returns arrays as JSON regardless of input format */
+    const char *tags = PQgetvalue(res, 0, 6);
+    ASSERT(tags != NULL, "Tags should not be NULL");
+    ASSERT(strstr(tags, "admin") != NULL, "Tags should contain 'admin'");
+    ASSERT(strstr(tags, "developer") != NULL, "Tags should contain 'developer'");
+
+    /* Verify nested object (metadata) - XTDB returns objects as JSON regardless of input format */
+    const char *metadata = PQgetvalue(res, 0, 7);
+    ASSERT(metadata != NULL, "Metadata should not be NULL");
+    ASSERT(strstr(metadata, "Engineering") != NULL, "Metadata should contain 'Engineering'");
+    ASSERT(strstr(metadata, "\"level\":5") != NULL || strstr(metadata, "\"level\": 5") != NULL,
+           "Metadata should contain level:5");
+    ASSERT(strstr(metadata, "2020-01-15") != NULL, "Metadata should contain joined date");
+
+    PQclear(res);
+
+    /* Verify total count */
+    snprintf(query, sizeof(query), "SELECT COUNT(*) FROM %s", table);
+    res = PQexec(conn, query);
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Count query failed");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 0), "3", "Should have 3 total records");
+    PQclear(res);
+
+    PASS();
+}
+
+TEST(nested_data_roundtrip) {
+    char *table = get_clean_table();
+    char query[512];
+
+    /* Insert a record with complex nested structures using JSON OID */
+    snprintf(query, sizeof(query), "INSERT INTO %s RECORDS $1", table);
+
+    const char *complex_json = "{"
+        "\"_id\": \"nested_test\","
+        "\"simple_array\": [1, 2, 3],"
+        "\"string_array\": [\"a\", \"b\", \"c\"],"
+        "\"nested_object\": {"
+            "\"inner_field\": \"value\","
+            "\"inner_number\": 42,"
+            "\"inner_array\": [\"x\", \"y\"]"
+        "},"
+        "\"array_of_objects\": ["
+            "{\"id\": 1, \"name\": \"first\"},"
+            "{\"id\": 2, \"name\": \"second\"}"
+        "]"
+    "}";
+
+    const char *paramValues[1] = {complex_json};
+    const Oid paramTypes[1] = {JSON_OID};
+
+    PGresult *res = PQexecParams(conn, query, 1, paramTypes, paramValues, NULL, NULL, 0);
+    ASSERT(PQresultStatus(res) == PGRES_COMMAND_OK, "Insert complex nested data failed");
+    PQclear(res);
+
+    /* Query back and verify nested structures are preserved */
+    snprintf(query, sizeof(query),
+             "SELECT _id, simple_array, string_array, nested_object, array_of_objects FROM %s WHERE _id = 'nested_test'",
+             table);
+    res = PQexec(conn, query);
+
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Select failed");
+    ASSERT_EQ_INT(PQntuples(res), 1, "Expected 1 row");
+
+    /* Verify simple_array */
+    const char *simple_array = PQgetvalue(res, 0, 1);
+    ASSERT(strstr(simple_array, "1") != NULL, "simple_array should contain 1");
+    ASSERT(strstr(simple_array, "2") != NULL, "simple_array should contain 2");
+    ASSERT(strstr(simple_array, "3") != NULL, "simple_array should contain 3");
+
+    /* Verify string_array */
+    const char *string_array = PQgetvalue(res, 0, 2);
+    ASSERT(strstr(string_array, "a") != NULL, "string_array should contain 'a'");
+    ASSERT(strstr(string_array, "b") != NULL, "string_array should contain 'b'");
+    ASSERT(strstr(string_array, "c") != NULL, "string_array should contain 'c'");
+
+    /* Verify nested_object */
+    const char *nested_object = PQgetvalue(res, 0, 3);
+    ASSERT(strstr(nested_object, "inner_field") != NULL, "nested_object should have inner_field");
+    ASSERT(strstr(nested_object, "value") != NULL, "nested_object.inner_field should be 'value'");
+    ASSERT(strstr(nested_object, "\"inner_number\":42") != NULL ||
+           strstr(nested_object, "\"inner_number\": 42") != NULL,
+           "nested_object should have inner_number: 42");
+
+    /* Verify array_of_objects */
+    const char *array_of_objects = PQgetvalue(res, 0, 4);
+    ASSERT(strstr(array_of_objects, "\"id\":1") != NULL ||
+           strstr(array_of_objects, "\"id\": 1") != NULL,
+           "array_of_objects should contain id: 1");
+    ASSERT(strstr(array_of_objects, "first") != NULL, "array_of_objects should contain 'first'");
+    ASSERT(strstr(array_of_objects, "second") != NULL, "array_of_objects should contain 'second'");
+
+    PQclear(res);
+    PASS();
+}
+
 // Transit-JSON Tests (simplified for C)
 
 TEST(transit_json_format) {
@@ -318,6 +589,9 @@ int main(void) {
     RUN_TEST(parameterized_query);
     RUN_TEST(json_records);
     RUN_TEST(load_sample_json);
+    RUN_TEST(json_with_oid);
+    RUN_TEST(transit_with_oid);
+    RUN_TEST(nested_data_roundtrip);
     RUN_TEST(transit_json_format);
     RUN_TEST(transit_json_encoding);
 
