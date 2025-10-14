@@ -167,4 +167,96 @@ describe("Transit-JSON with RECORDS", () => {
     assert.strictEqual(result[0].name, "James");
     assert.strictEqual(result[0].age, 35);
   });
+
+  it("should use NEST_ONE to decode entire record with transit fallback", async () => {
+    const { readFile } = await import("fs/promises");
+    const transitData = await readFile("../test-data/sample-users-transit.json", "utf8");
+
+    // Parse each line as transit-JSON
+    const lines = transitData.trim().split('\n');
+    const users = lines.map(line => transitReader.read(line));
+
+    for (const user of users) {
+      await sql`
+        INSERT INTO nest_one_test RECORDS
+          ${sql.types.transit(user)}
+      `;
+    }
+
+    // Query using NEST_ONE to get entire record as a single nested object
+    const result = await sql`SELECT NEST_ONE(FROM nest_one_test WHERE _id = ${"alice"}) AS r`;
+
+    assert.strictEqual(result.length, 1);
+
+    // The entire record comes back as a nested object
+    const record = result[0].r;
+    console.log(`\n✅ NEST_ONE returned entire record: ${typeof record}`);
+    console.log(`   Record:`, record);
+
+    // With transit fallback, the entire record should be properly typed
+    assert.strictEqual(typeof record, "object");
+
+    // Transit-js decodes transit maps to Map objects, so we need to use .get()
+    const isMap = typeof record.get === 'function';
+    console.log(`   Record is transit Map: ${isMap}`);
+
+    // Helper to get value from either Map or plain object
+    const getValue = (obj, key) => (typeof obj.get === 'function' ? obj.get(key) : obj[key]);
+
+    // Verify all fields are accessible as native types
+    assert.strictEqual(getValue(record, "_id"), "alice");
+    assert.strictEqual(getValue(record, "name"), "Alice Smith");
+    assert.strictEqual(getValue(record, "age"), 30);
+    assert.strictEqual(getValue(record, "active"), true);
+    assert.strictEqual(getValue(record, "email"), "alice@example.com");
+    assert.ok(Math.abs(getValue(record, "salary") - 125000.5) < 0.01);
+
+    // Nested array should be native Array
+    const tags = getValue(record, "tags");
+    assert.ok(Array.isArray(tags), "tags should be an array");
+    assert.ok(tags.includes("admin"));
+    assert.ok(tags.includes("developer"));
+    console.log(`   ✅ Nested array (tags) properly typed:`, tags);
+
+    // Nested object should be native object (or transit Map)
+    const metadata = getValue(record, "metadata");
+    assert.strictEqual(typeof metadata, "object");
+    const department = getValue(metadata, "department");
+    const level = getValue(metadata, "level");
+    const joined = getValue(metadata, "joined");
+
+    assert.strictEqual(department, "Engineering");
+    assert.strictEqual(level, 5);
+
+    // Verify joined date - transit-js returns TaggedValue objects for unknown tags
+    console.log(`   Joined raw value: ${joined} (type: ${typeof joined}, constructor: ${joined?.constructor?.name})`);
+
+    // TaggedValue objects have a 'rep' property containing the actual value
+    let parsedDate;
+    if (joined && typeof joined === 'object' && 'rep' in joined) {
+      // Extract the rep (representation) from TaggedValue
+      const dateStr = joined.rep;
+      console.log(`   Joined is TaggedValue with rep: ${dateStr}`);
+      // Parse the date string, removing [UTC] suffix if present
+      const cleanDateStr = dateStr.split('[')[0];
+      parsedDate = new Date(cleanDateStr);
+    } else if (joined instanceof Date) {
+      parsedDate = joined;
+    } else {
+      throw new Error(`Unexpected joined type: ${typeof joined}`);
+    }
+
+    // Verify the date value
+    const expectedDate = new Date("2020-01-15T00:00:00Z");
+    assert.strictEqual(parsedDate.getFullYear(), expectedDate.getFullYear());
+    assert.strictEqual(parsedDate.getMonth(), expectedDate.getMonth());
+    assert.strictEqual(parsedDate.getDate(), expectedDate.getDate());
+    console.log(`   ✅ Decoded joined date to Date object: ${parsedDate.toISOString()}`);
+    console.log(`   ✅ Transit tagged date successfully decoded from TaggedValue to native Date`);
+
+    console.log(`   ✅ Nested object (metadata) properly typed:`, metadata);
+
+    console.log(`\n✅ NEST_ONE with transit fallback successfully decoded entire record!`);
+    console.log(`   All fields accessible as native JavaScript types`);
+  });
 });

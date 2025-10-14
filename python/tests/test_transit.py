@@ -396,3 +396,100 @@ async def test_transit_verify_with_unmarshalling(conn_transit, clean_table_trans
     print(f"   - Nested objects with dates (metadata)")
     print(f"   ✨ transit-JSON input == XTDB output (100% data fidelity)")
     print(f"\n💡 Note: Custom transit-JSON parser used (no external transit library needed!)")
+
+@pytest.mark.asyncio
+async def test_transit_nest_one_full_record(conn_transit, clean_table_transit):
+    """
+    Test NEST_ONE() with transit fallback to decode an entire record as a nested object.
+
+    This demonstrates that transit decoding works for entire records, not just nested fields.
+    """
+    import os
+
+    table = clean_table_transit
+    test_data_path = os.path.join(os.path.dirname(__file__), "../../test-data/sample-users-transit.json")
+
+    # Register transit dumper for string type
+    conn_transit.adapters.register_dumper(str, TransitDumper)
+
+    with open(test_data_path) as f:
+        lines = f.readlines()
+
+    # Insert using transit-JSON OID (16384)
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        await conn_transit.execute(
+            f"INSERT INTO {table} RECORDS %s",
+            (line,)
+        )
+
+    # Query using NEST_ONE to get entire record as a single nested object
+    cursor = await conn_transit.execute(
+        f"SELECT NEST_ONE(FROM {table} WHERE _id = 'alice') AS r"
+    )
+    result = await cursor.fetchone()
+
+    assert result is not None, "Expected one result"
+
+    # The entire record comes back as a transit-JSON string that needs to be decoded
+    record_raw = result[0]
+    print(f"\n✅ NEST_ONE returned entire record: {type(record_raw).__name__}")
+    print(f"   Raw record: {record_raw}")
+
+    # Decode the transit-JSON string
+    record = TransitDecoder.decode(record_raw)
+    print(f"   Decoded record: {type(record).__name__}")
+
+    # With transit fallback, the entire record should be properly typed
+    assert isinstance(record, dict), f"Expected dict after decoding, got {type(record)}"
+
+    # Verify all fields are accessible as native types
+    assert record['_id'] == 'alice'
+    assert record['name'] == 'Alice Smith'
+    assert record['age'] == 30
+    assert record['active'] is True
+    assert record['email'] == 'alice@example.com'
+    assert record['salary'] == 125000.5
+
+    # Nested array should be native list
+    assert isinstance(record['tags'], list), f"tags should be list, got {type(record['tags'])}"
+    assert 'admin' in record['tags']
+    assert 'developer' in record['tags']
+    print(f"   ✅ Nested array (tags) properly typed: {record['tags']}")
+
+    # Nested object should be native dict
+    assert isinstance(record['metadata'], dict), f"metadata should be dict, got {type(record['metadata'])}"
+    assert record['metadata']['department'] == 'Engineering'
+    assert record['metadata']['level'] == 5
+
+    # Verify joined date - after transit decoding, tagged values like ["~#time/zoned-date-time", "..."]
+    # are decoded to just the value string
+    joined_raw = record['metadata']['joined']
+    print(f"   Joined raw value: {joined_raw} (type: {type(joined_raw).__name__})")
+
+    if isinstance(joined_raw, str):
+        # The transit decoder extracts the value from ["~#time/zoned-date-time", "2020-01-15T00:00Z[UTC]"]
+        # leaving us with just "2020-01-15T00:00Z[UTC]"
+        # Remove the [UTC] timezone annotation and parse the ISO datetime string
+        date_str = joined_raw.split('[')[0]  # Remove [UTC] suffix
+        try:
+            parsed_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            print(f"   ✅ Decoded joined date to datetime: {parsed_date}")
+
+            # Verify it's the expected date
+            assert parsed_date.year == 2020
+            assert parsed_date.month == 1
+            assert parsed_date.day == 15
+            print(f"   ✅ Transit tagged date successfully decoded and verified")
+        except ValueError as e:
+            pytest.fail(f"Failed to parse date {date_str}: {e}")
+    else:
+        pytest.fail(f"Expected joined to be string, got {type(joined_raw)}: {joined_raw}")
+
+    print(f"   ✅ Nested object (metadata) properly typed: {record['metadata']}")
+
+    print(f"\n✅ NEST_ONE with transit fallback successfully decoded entire record!")
+    print(f"   All fields accessible as native Python types")

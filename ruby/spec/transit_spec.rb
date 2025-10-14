@@ -71,7 +71,12 @@ class TransitDecoder
   def self.decode_value(data)
     case data
     when Array
-      if data[0] == "^ "
+      if data.length == 2 && data[0].is_a?(String) && data[0].start_with?('~#')
+        # Transit tagged value: ["~#tag", value]
+        # For dates like ["~#time/zoned-date-time", "2020-01-15T00:00Z[UTC]"]
+        # Extract just the value
+        decode_value(data[1])
+      elsif data[0] == "^ "
         # Transit map
         decode_map(data)
       else
@@ -206,5 +211,93 @@ RSpec.describe "Transit-JSON Operations" do
     rows = db["SELECT _id FROM #{table} WHERE _id = 'types_test'"].all
 
     expect(rows.length).to eq(1)
+  end
+
+  it "uses NEST_ONE to decode entire record with transit fallback" do
+    # Load transit-JSON file
+    transit_path = File.join(File.dirname(__FILE__), '../../test-data/sample-users-transit.json')
+    lines = File.readlines(transit_path)
+
+    # Get raw pg connection from Sequel
+    conn = db.synchronize { |c| c }
+
+    lines.each do |line|
+      line = line.strip
+      next if line.empty?
+
+      # Insert using transit OID (16384)
+      conn.exec_params("INSERT INTO #{table} RECORDS $1",
+                       [{value: line, type: 16384, format: 0}])
+    end
+
+    # Query using NEST_ONE to get entire record as a single nested object
+    result = db["SELECT NEST_ONE(FROM #{table} WHERE _id = 'alice') AS r"].first
+
+    expect(result).not_to be_nil
+
+    # The entire record comes back as a transit-JSON string that needs to be decoded
+    record_raw = result[:r]
+    puts "\n✅ NEST_ONE returned entire record: #{record_raw.class.name}"
+    puts "   Raw record: #{record_raw}"
+
+    # Decode the transit-JSON string
+    record = TransitDecoder.decode(record_raw)
+    puts "   Decoded record: #{record.class.name}"
+
+    # With transit fallback, the entire record should be properly typed
+    expect(record).to be_a(Hash)
+
+    # Verify all fields are accessible as native types
+    expect(record['_id']).to eq('alice')
+    expect(record['name']).to eq('Alice Smith')
+    expect(record['age']).to eq(30)
+    expect(record['active']).to be true
+    expect(record['email']).to eq('alice@example.com')
+    expect(record['salary']).to be_within(0.01).of(125000.5)
+
+    # Nested array should be native Array
+    expect(record['tags']).to be_a(Array)
+    expect(record['tags']).to include('admin')
+    expect(record['tags']).to include('developer')
+    puts "   ✅ Nested array (tags) properly typed: #{record['tags']}"
+
+    # Nested object should be native Hash
+    expect(record['metadata']).to be_a(Hash)
+    expect(record['metadata']['department']).to eq('Engineering')
+    expect(record['metadata']['level']).to eq(5)
+
+    # Verify joined date - after transit decoding, tagged values like ["~#time/zoned-date-time", "..."]
+    # are decoded to just the value string
+    joined_raw = record['metadata']['joined']
+    puts "   Joined raw value: #{joined_raw} (type: #{joined_raw.class})"
+
+    expect(joined_raw).to be_a(String)
+
+    # The transit decoder extracts the value from ["~#time/zoned-date-time", "2020-01-15T00:00Z[UTC]"]
+    # leaving us with just "2020-01-15T00:00Z[UTC]"
+    # Parse the ISO datetime string
+    require 'date'
+    begin
+      # Handle both datetime with timezone and plain dates
+      parsed_date = if joined_raw.include?('T')
+        DateTime.iso8601(joined_raw.split('[')[0]) # Remove [UTC] suffix if present
+      else
+        Date.iso8601(joined_raw)
+      end
+      puts "   ✅ Decoded joined date to #{parsed_date.class}: #{parsed_date}"
+
+      # Verify it's the expected date
+      expect(parsed_date.year).to eq(2020)
+      expect(parsed_date.month).to eq(1)
+      expect(parsed_date.day).to eq(15)
+      puts "   ✅ Transit tagged date successfully decoded and verified"
+    rescue ArgumentError => e
+      fail "Failed to parse date #{joined_raw}: #{e}"
+    end
+
+    puts "   ✅ Nested object (metadata) properly typed: #{record['metadata']}"
+
+    puts "\n✅ NEST_ONE with transit fallback successfully decoded entire record!"
+    puts "   All fields accessible as native Ruby types"
   end
 end

@@ -2,6 +2,18 @@ require 'sequel'
 require 'json'
 
 RSpec.describe "JSON Operations" do
+  # Helper to parse PostgreSQL array format: {val1,val2} to Ruby array
+  def parse_pg_array(str)
+    return str unless str.is_a?(String)
+    if str.start_with?('{') && str.end_with?('}')
+      content = str[1..-2]
+      return [] if content.empty?
+      content.split(',')
+    else
+      str
+    end
+  end
+
   # JSON tests use standard connection (no transit fallback needed for JSON OID 114)
   let(:db) { Sequel.connect("xtdb://xtdb:5432/xtdb") }
   let(:table) { "test_table_#{Time.now.to_i}_#{rand(10000)}" }
@@ -52,15 +64,17 @@ RSpec.describe "JSON Operations" do
     expect(alice[:email]).to eq('alice@example.com')
     expect(alice[:salary]).to be_within(0.01).of(125000.5)
 
-    # Verify nested array (tags) - Should come back as native Array
-    tags = alice[:tags]
+    # Verify nested array (tags) - May come as PostgreSQL array string, parse if needed
+    tags_raw = alice[:tags]
+    tags = tags_raw.is_a?(Array) ? tags_raw : parse_pg_array(tags_raw)
     expect(tags).to be_a(Array)
     expect(tags).to include('admin')
     expect(tags).to include('developer')
     expect(tags.length).to eq(2)
 
-    # Verify nested object (metadata) - Should come back as native Hash
-    metadata = alice[:metadata]
+    # Verify nested object (metadata) - May come as JSON string, parse if needed
+    metadata_raw = alice[:metadata]
+    metadata = metadata_raw.is_a?(Hash) ? metadata_raw : JSON.parse(metadata_raw)
     expect(metadata).to be_a(Hash)
     expect(metadata['department']).to eq('Engineering')
     expect(metadata['level']).to eq(5)

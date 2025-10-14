@@ -12,6 +12,12 @@ import (
 
 // DecodeTransitValue attempts to decode a transit-encoded value (copied from json_test.go)
 func DecodeTransitValueTransit(val interface{}) interface{} {
+	// Handle if val is already a decoded array or object (not a JSON string)
+	if arr, ok := val.([]interface{}); ok {
+		return decodeTransitArray(arr)
+	}
+
+	// Handle if val is a JSON string that needs parsing
 	str, ok := val.(string)
 	if !ok {
 		return val
@@ -29,8 +35,12 @@ func DecodeTransitValueTransit(val interface{}) interface{} {
 		return data
 	}
 
+	return decodeTransitArray(arr)
+}
+
+func decodeTransitArray(arr []interface{}) interface{} {
 	if len(arr) == 0 {
-		return data
+		return arr
 	}
 
 	// Transit tagged value: [tag, value]
@@ -42,30 +52,29 @@ func DecodeTransitValueTransit(val interface{}) interface{} {
 	}
 
 	// Transit map: ["^ ", key1, val1, key2, val2, ...]
-	if arr[0] == "^ " {
-		result := make(map[string]interface{})
-		for i := 1; i < len(arr); i += 2 {
-			if i+1 >= len(arr) {
-				break
-			}
-			key := fmt.Sprintf("%v", arr[i])
-			value := DecodeTransitValueTransit(arr[i+1])
-
-			// Try to parse value as JSON if it's a string that looks like JSON
-			if strVal, ok := value.(string); ok {
-				var parsed interface{}
-				if err := json.Unmarshal([]byte(strVal), &parsed); err == nil {
-					value = DecodeTransitValueTransit(parsed)
+	if len(arr) > 0 {
+		if firstElem, ok := arr[0].(string); ok && firstElem == "^ " {
+			result := make(map[string]interface{})
+			for i := 1; i < len(arr); i += 2 {
+				if i+1 >= len(arr) {
+					break
 				}
-			}
+				key := fmt.Sprintf("%v", arr[i])
+				// Recursively decode the value (handles nested maps)
+				value := DecodeTransitValueTransit(arr[i+1])
 
-			result[key] = value
+				result[key] = value
+			}
+			return result
 		}
-		return result
 	}
 
-	// Regular array
-	return data
+	// Regular array - recursively decode elements
+	result := make([]interface{}, len(arr))
+	for i, elem := range arr {
+		result[i] = DecodeTransitValueTransit(elem)
+	}
+	return result
 }
 
 // MinimalTransitEncoder provides basic transit-JSON encoding
@@ -559,4 +568,162 @@ func TestTransitJSONWithDate(t *testing.T) {
 	if id != "date_test" || name != "Date Test" {
 		t.Errorf("Got (%s, %s), expected (date_test, Date Test)", id, name)
 	}
+}
+
+func TestTransitNestOneFullRecord(t *testing.T) {
+	conn := getConnTransit(t)
+	defer conn.Close(context.Background())
+
+	table := getCleanTable()
+
+	// Load sample-users-transit.json
+	content, err := os.ReadFile("../test-data/sample-users-transit.json")
+	if err != nil {
+		t.Fatalf("Failed to read transit file: %v", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	sql := fmt.Sprintf("INSERT INTO %s RECORDS $1", table)
+
+	// Insert using transit OID (16384)
+	pgconn := conn.PgConn()
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		result := pgconn.ExecParams(context.Background(), sql,
+			[][]byte{[]byte(line)},
+			[]uint32{TransitOID},
+			[]int16{0},
+			[]int16{0})
+
+		_, err = result.Close()
+		if err != nil {
+			t.Fatalf("Insert failed: %v", err)
+		}
+	}
+
+	// Query using NEST_ONE to get entire record as a single nested object
+	rows, err := conn.Query(context.Background(),
+		fmt.Sprintf("SELECT NEST_ONE(FROM %s WHERE _id = 'alice') AS r", table))
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		t.Fatal("Expected one result")
+	}
+
+	values, err := rows.Values()
+	if err != nil {
+		t.Fatalf("Failed to get values: %v", err)
+	}
+
+	// The entire record comes back as a transit-JSON string that needs to be decoded
+	recordRaw := values[0]
+	t.Logf("\n✅ NEST_ONE returned entire record: %T", recordRaw)
+	t.Logf("   Raw record: %v", recordRaw)
+
+	// Decode the transit-JSON string
+	recordDecoded := DecodeTransitValueTransit(recordRaw)
+	record, ok := recordDecoded.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected map[string]interface{} after decoding, got %T", recordDecoded)
+	}
+
+	t.Logf("   Decoded record: %T", record)
+
+	// Verify all fields are accessible as native types
+	if record["_id"] != "alice" {
+		t.Errorf("Expected _id='alice', got %v", record["_id"])
+	}
+	if record["name"] != "Alice Smith" {
+		t.Errorf("Expected name='Alice Smith', got %v", record["name"])
+	}
+
+	// Age might be different numeric types
+	var age int64
+	switch v := record["age"].(type) {
+	case int32:
+		age = int64(v)
+	case int64:
+		age = v
+	case float64:
+		age = int64(v)
+	default:
+		t.Errorf("Expected age to be numeric, got %T: %v", record["age"], record["age"])
+	}
+	if age != 30 {
+		t.Errorf("Expected age=30, got %d", age)
+	}
+
+	if active, ok := record["active"].(bool); !ok || !active {
+		t.Errorf("Expected active=true, got %v", record["active"])
+	}
+
+	// Nested array should be native []interface{}
+	if tags, ok := record["tags"].([]interface{}); ok {
+		t.Logf("   ✅ Nested array (tags) properly typed: %v", tags)
+		if len(tags) != 2 || tags[0] != "admin" || tags[1] != "developer" {
+			t.Errorf("Expected tags ['admin', 'developer'], got %v", tags)
+		}
+	} else {
+		t.Errorf("Expected tags to be []interface{}, got %T: %v", record["tags"], record["tags"])
+	}
+
+	// Nested object should be native map[string]interface{}
+	t.Logf("   Raw metadata value: %v (type: %T)", record["metadata"], record["metadata"])
+	if metadata, ok := record["metadata"].(map[string]interface{}); ok {
+		t.Logf("   ✅ Nested object (metadata) properly typed: %v", metadata)
+		if metadata["department"] != "Engineering" {
+			t.Errorf("Expected department='Engineering', got %v", metadata["department"])
+		}
+
+		// Verify joined date - after transit decoding, tagged values like ["~#time/zoned-date-time", "..."]
+		// are decoded to just the value string
+		joinedRaw := metadata["joined"]
+		t.Logf("   Joined raw value: %v (type: %T)", joinedRaw, joinedRaw)
+
+		if joinedStr, ok := joinedRaw.(string); ok {
+			// The transit decoder extracts the value from ["~#time/zoned-date-time", "2020-01-15T00:00Z[UTC]"]
+			// leaving us with just "2020-01-15T00:00Z[UTC]"
+			// Remove the [UTC] timezone annotation
+			dateStr := strings.Split(joinedStr, "[")[0]
+
+			// Parse the ISO datetime string - handle both RFC3339 and simplified Z format
+			var parsedDate time.Time
+			var err error
+			if strings.HasSuffix(dateStr, "Z") {
+				// Try parsing with custom format for simplified Z notation
+				parsedDate, err = time.Parse("2006-01-02T15:04:05Z", dateStr)
+				if err != nil {
+					// Try without seconds
+					parsedDate, err = time.Parse("2006-01-02T15:04Z", dateStr)
+				}
+			} else {
+				parsedDate, err = time.Parse(time.RFC3339, dateStr)
+			}
+
+			if err != nil {
+				t.Errorf("Failed to parse date %s: %v", dateStr, err)
+			} else {
+				t.Logf("   ✅ Decoded joined date to time.Time: %v", parsedDate)
+				// Verify it's the expected date
+				if parsedDate.Year() != 2020 || parsedDate.Month() != 1 || parsedDate.Day() != 15 {
+					t.Errorf("Expected date 2020-01-15, got %v", parsedDate)
+				}
+				t.Logf("   ✅ Transit tagged date successfully decoded and verified")
+			}
+		} else {
+			t.Errorf("Expected joined to be string, got %T: %v", joinedRaw, joinedRaw)
+		}
+	} else {
+		t.Errorf("Expected metadata to be map[string]interface{}, got %T: %v", record["metadata"], record["metadata"])
+	}
+
+	t.Logf("\n✅ NEST_ONE with transit fallback successfully decoded entire record!")
+	t.Logf("   All fields accessible as native Go types")
 }

@@ -338,6 +338,205 @@ defmodule XTDBTest do
     GenServer.stop(pid)
   end
 
+  test "transit nest one full record" do
+    {:ok, pid} = Postgrex.start_link(@db_config_transit)
+    table = get_clean_table()
+
+    # Load sample-users-transit.json
+    {:ok, content} = File.read("../test-data/sample-users-transit.json")
+
+    lines =
+      content
+      |> String.split("\n")
+      |> Enum.reject(&(&1 == ""))
+
+    # Insert using transit OID (16384) with single parameter per record
+    {:ok, query} = Postgrex.prepare(pid, "", "INSERT INTO #{table} RECORDS $1")
+
+    # Manually modify the query to specify OID 16384 for transit-JSON
+    modified_query = %{query |
+      param_oids: [16384],
+      param_formats: [:text],
+      param_types: [Postgrex.Extensions.Raw]
+    }
+
+    for line <- lines do
+      {:ok, _, _result} = Postgrex.execute(pid, modified_query, [line])
+    end
+
+    Postgrex.close(pid, query)
+
+    # Query using NEST_ONE to get entire record as a single nested object
+    result = Postgrex.query!(pid, "SELECT NEST_ONE(FROM #{table} WHERE _id = 'alice') AS r", [])
+
+    assert %Postgrex.Result{rows: [[record_raw]]} = result
+
+    IO.puts("\n✅ NEST_ONE returned entire record (raw): #{inspect(record_raw)}")
+
+    # The entire record comes back as a transit-JSON string or map depending on the driver
+    record = if is_binary(record_raw) do
+      # Decode transit-JSON string
+      {:ok, decoded} = Jason.decode(record_raw)
+      decode_transit(decoded)
+    else
+      record_raw
+    end
+
+    # The entire record should be a native Map after decoding
+    assert is_map(record), "Record should be a Map after decoding"
+
+    IO.puts("   Decoded record keys: #{inspect(Map.keys(record))}")
+
+    # With transit fallback, the entire record should be properly typed
+    # Verify all fields are accessible as native types
+    assert record["_id"] == "alice"
+    assert record["name"] == "Alice Smith"
+    assert record["age"] == 30
+    assert record["active"] == true
+    assert record["email"] == "alice@example.com"
+    assert record["salary"] == 125000.5
+
+    # Nested array should be native List
+    assert is_list(record["tags"]), "Tags should be a native list"
+    assert length(record["tags"]) == 2
+    assert "admin" in record["tags"]
+    assert "developer" in record["tags"]
+    IO.puts("   ✅ Nested array (tags) properly typed: #{inspect(record["tags"])}")
+
+    # Nested object should be native Map
+    assert is_map(record["metadata"]), "Metadata should be a native map"
+    metadata = record["metadata"]
+
+    assert metadata["department"] == "Engineering"
+    assert metadata["level"] == 5
+
+    # Verify joined date - after transit decoding, tagged values like ["~#time/zoned-date-time", "..."]
+    # are decoded to just the value string
+    joined_raw = metadata["joined"]
+    IO.puts("   Joined raw value: #{inspect(joined_raw)} (type: #{inspect(__MODULE__.type_of(joined_raw))})")
+
+    assert is_binary(joined_raw), "Expected joined to be a string"
+
+    # The transit decoder extracts the value from ["~#time/zoned-date-time", "2020-01-15T00:00Z[UTC]"]
+    # leaving us with just "2020-01-15T00:00Z[UTC]"
+    # Remove the [UTC] timezone annotation and normalize format
+    date_str =
+      joined_raw
+      |> String.split("[")
+      |> List.first()
+      |> String.replace(~r/Z$/, "+00:00")  # Replace trailing Z with +00:00
+      |> then(fn str ->
+        # Add seconds if missing (HH:MM format -> HH:MM:SS format)
+        if Regex.match?(~r/T\d{2}:\d{2}[\+\-]/, str) do
+          String.replace(str, ~r/(T\d{2}:\d{2})([\+\-])/, "\\1:00\\2")
+        else
+          str
+        end
+      end)
+
+    # Parse to Date, NaiveDateTime, or DateTime
+    case DateTime.from_iso8601(date_str) do
+      {:ok, parsed_date, _offset} ->
+        IO.puts("   ✅ Decoded joined date to DateTime: #{inspect(parsed_date)}")
+
+        # Verify it's the expected date
+        assert parsed_date.year == 2020
+        assert parsed_date.month == 1
+        assert parsed_date.day == 15
+        IO.puts("   ✅ Transit tagged date successfully decoded and verified")
+
+      {:error, reason} ->
+        # Try NaiveDateTime if DateTime parsing fails
+        case NaiveDateTime.from_iso8601(date_str) do
+          {:ok, parsed_date} ->
+            IO.puts("   ✅ Decoded joined date to NaiveDateTime: #{inspect(parsed_date)}")
+            assert parsed_date.year == 2020
+            assert parsed_date.month == 1
+            assert parsed_date.day == 15
+            IO.puts("   ✅ Transit tagged date successfully decoded and verified")
+
+          {:error, _} ->
+            # Try Date if NaiveDateTime fails
+            case Date.from_iso8601(date_str) do
+              {:ok, parsed_date} ->
+                IO.puts("   ✅ Decoded joined date to Date: #{inspect(parsed_date)}")
+                assert parsed_date.year == 2020
+                assert parsed_date.month == 1
+                assert parsed_date.day == 15
+                IO.puts("   ✅ Transit tagged date successfully decoded and verified")
+
+              {:error, _} ->
+                flunk("Failed to parse transit date #{date_str}: #{reason}")
+            end
+        end
+    end
+
+    IO.puts("   ✅ Nested object (metadata) properly typed: #{inspect(metadata)}")
+
+    IO.puts("\n✅ NEST_ONE with transit fallback successfully decoded entire record!")
+    IO.puts("   All fields accessible as native Elixir types")
+
+    GenServer.stop(pid)
+  end
+
+  # Helper function to decode transit-JSON structures
+  defp decode_transit(value) when is_list(value) do
+    case value do
+      # Transit map: ["^ ", key1, val1, key2, val2, ...]
+      ["^ " | pairs] ->
+        pairs
+        |> Enum.chunk_every(2)
+        |> Enum.map(fn
+          [k, v] -> {decode_transit(k), decode_transit(v)}
+          [k] -> {decode_transit(k), nil}
+        end)
+        |> Map.new()
+
+      # Transit tagged value: ["~#tag", value]
+      [tag, val] when is_binary(tag) ->
+        if String.starts_with?(tag, "~#") do
+          decode_transit(val)
+        else
+          # Regular two-element array
+          [decode_transit(tag), decode_transit(val)]
+        end
+
+      # Regular array
+      _ ->
+        Enum.map(value, &decode_transit/1)
+    end
+  end
+
+  defp decode_transit(value) when is_binary(value) do
+    cond do
+      # Transit keyword: "~:keyword"
+      String.starts_with?(value, "~:") ->
+        String.slice(value, 2..-1//1)
+
+      # Transit date: "~tdate"
+      String.starts_with?(value, "~t") ->
+        String.slice(value, 2..-1//1)
+
+      true ->
+        value
+    end
+  end
+
+  defp decode_transit(value), do: value
+
+  # Helper function to get type name
+  def type_of(value) do
+    cond do
+      is_binary(value) -> :string
+      is_map(value) -> :map
+      is_list(value) -> :list
+      is_integer(value) -> :integer
+      is_float(value) -> :float
+      is_boolean(value) -> :boolean
+      true -> :unknown
+    end
+  end
+
   test "transit json encoding" do
     # Test transit encoding capabilities
     data = %{

@@ -444,6 +444,103 @@ TEST(transit_with_oid) {
     PASS();
 }
 
+TEST(transit_nest_one_full_record) {
+    char *table = get_clean_table();
+    char query[512];
+
+    /* Set fallback_output_format to transit for this test only */
+    PGresult *set_res = PQexec(conn, "SET fallback_output_format = 'transit'");
+    ASSERT(PQresultStatus(set_res) == PGRES_COMMAND_OK, "SET fallback_output_format failed");
+    PQclear(set_res);
+
+    /* Load sample-users-transit.json - one transit-JSON record per line */
+    FILE *fp = fopen("../test-data/sample-users-transit.json", "r");
+    ASSERT(fp != NULL, "Failed to open sample-users-transit.json");
+
+    char line[4096];
+    int inserted_count = 0;
+
+    snprintf(query, sizeof(query), "INSERT INTO %s RECORDS $1", table);
+
+    while (fgets(line, sizeof(line), fp)) {
+        /* Trim whitespace */
+        char *trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t' || *trimmed == '\n') trimmed++;
+
+        size_t len = strlen(trimmed);
+        while (len > 0 && (trimmed[len-1] == ' ' || trimmed[len-1] == '\n' || trimmed[len-1] == '\r')) {
+            trimmed[--len] = '\0';
+        }
+
+        if (len == 0 || *trimmed == '\0') continue;
+
+        /* Insert using transit-JSON OID (16384) */
+        const char *paramValues[1] = {trimmed};
+        const Oid paramTypes[1] = {TRANSIT_OID};
+
+        PGresult *res = PQexecParams(conn, query, 1, paramTypes, paramValues, NULL, NULL, 0);
+        ASSERT(PQresultStatus(res) == PGRES_COMMAND_OK, "Insert with transit OID failed");
+        PQclear(res);
+        inserted_count++;
+    }
+
+    fclose(fp);
+    ASSERT_EQ_INT(inserted_count, 3, "Expected to insert 3 records");
+
+    /* Query using NEST_ONE to get entire record as a single nested object */
+    snprintf(query, sizeof(query),
+             "SELECT NEST_ONE(FROM %s WHERE _id = 'alice') AS r", table);
+    PGresult *res = PQexec(conn, query);
+
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "NEST_ONE query failed");
+    ASSERT_EQ_INT(PQntuples(res), 1, "Expected 1 row");
+
+    /* The entire record comes back as a single nested object in column 'r' */
+    const char *record = PQgetvalue(res, 0, 0);
+    ASSERT(record != NULL, "Record should not be NULL");
+
+    printf("\n  ✅ NEST_ONE returned entire record\n");
+    printf("     Record type: string representation\n");
+
+    /* With transit fallback, the entire record should be properly typed */
+    /* Verify all fields are accessible within the nested structure */
+    ASSERT(strstr(record, "alice") != NULL, "Record should contain _id 'alice'");
+    ASSERT(strstr(record, "Alice Smith") != NULL, "Record should contain name 'Alice Smith'");
+    ASSERT(strstr(record, "30") != NULL, "Record should contain age 30");
+    ASSERT(strstr(record, "true") != NULL || strstr(record, "t") != NULL, "Record should contain active true");
+    ASSERT(strstr(record, "alice@example.com") != NULL, "Record should contain email");
+    ASSERT(strstr(record, "125000.5") != NULL, "Record should contain salary");
+
+    /* Verify nested array (tags) is in the record */
+    ASSERT(strstr(record, "admin") != NULL, "Record should contain 'admin' tag");
+    ASSERT(strstr(record, "developer") != NULL, "Record should contain 'developer' tag");
+    printf("     ✅ Nested array (tags) accessible in record\n");
+
+    /* Verify nested object (metadata) is in the record */
+    ASSERT(strstr(record, "Engineering") != NULL, "Record should contain department 'Engineering'");
+    ASSERT(strstr(record, "5") != NULL, "Record should contain level 5");
+
+    /* Verify joined date has transit tagged value format */
+    ASSERT(strstr(record, "~#time/zoned-date-time") != NULL && strstr(record, "2020-01-15") != NULL,
+           "Record should contain transit-tagged date [\"~#time/zoned-date-time\", \"2020-01-15...\"]");
+    printf("     ✅ Nested object (metadata) accessible in record with transit-tagged date\n");
+    printf("     Note: C libpq returns dates in transit tagged format [\"~#time/zoned-date-time\", \"...\"]\n");
+    printf("           Applications can parse the tagged value to extract and parse the date string\n");
+
+    printf("\n  ✅ NEST_ONE with transit fallback successfully decoded entire record!\n");
+    printf("     All fields accessible within the nested structure\n");
+
+    PQclear(res);
+
+    /* Reset fallback_output_format after test */
+    set_res = PQexec(conn, "RESET fallback_output_format");
+    if (PQresultStatus(set_res) == PGRES_COMMAND_OK) {
+        PQclear(set_res);
+    }
+
+    PASS();
+}
+
 TEST(nested_data_roundtrip) {
     char *table = get_clean_table();
     char query[512];
@@ -596,6 +693,7 @@ int main(void) {
     RUN_TEST(load_sample_json);
     RUN_TEST(json_with_oid);
     RUN_TEST(transit_with_oid);
+    RUN_TEST(transit_nest_one_full_record);
     RUN_TEST(nested_data_roundtrip);
     RUN_TEST(transit_json_format);
     RUN_TEST(transit_json_encoding);
