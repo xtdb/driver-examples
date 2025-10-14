@@ -11,8 +11,18 @@ import (
 
 var tableCounter int
 
+// getConn creates a standard database connection (for JSON and basic tests)
 func getConn(t *testing.T) *pgx.Conn {
 	conn, err := pgx.Connect(context.Background(), "postgres://xtdb:5432/xtdb")
+	if err != nil {
+		t.Fatalf("Unable to connect: %v", err)
+	}
+	return conn
+}
+
+// getConnTransit creates a database connection with transit fallback (for transit tests only)
+func getConnTransit(t *testing.T) *pgx.Conn {
+	conn, err := pgx.Connect(context.Background(), "postgres://xtdb:5432/xtdb?fallback_output_format=transit")
 	if err != nil {
 		t.Fatalf("Unable to connect: %v", err)
 	}

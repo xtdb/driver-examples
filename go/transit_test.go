@@ -10,6 +10,64 @@ import (
 	"time"
 )
 
+// DecodeTransitValue attempts to decode a transit-encoded value (copied from json_test.go)
+func DecodeTransitValueTransit(val interface{}) interface{} {
+	str, ok := val.(string)
+	if !ok {
+		return val
+	}
+
+	// Try to parse as JSON
+	var data interface{}
+	if err := json.Unmarshal([]byte(str), &data); err != nil {
+		return val
+	}
+
+	// Check if it's a transit structure
+	arr, ok := data.([]interface{})
+	if !ok {
+		return data
+	}
+
+	if len(arr) == 0 {
+		return data
+	}
+
+	// Transit tagged value: [tag, value]
+	if len(arr) == 2 {
+		if tag, ok := arr[0].(string); ok && len(tag) > 0 && tag[0:2] == "~#" {
+			// For nested tagged values, recursively decode
+			return DecodeTransitValueTransit(arr[1])
+		}
+	}
+
+	// Transit map: ["^ ", key1, val1, key2, val2, ...]
+	if arr[0] == "^ " {
+		result := make(map[string]interface{})
+		for i := 1; i < len(arr); i += 2 {
+			if i+1 >= len(arr) {
+				break
+			}
+			key := fmt.Sprintf("%v", arr[i])
+			value := DecodeTransitValueTransit(arr[i+1])
+
+			// Try to parse value as JSON if it's a string that looks like JSON
+			if strVal, ok := value.(string); ok {
+				var parsed interface{}
+				if err := json.Unmarshal([]byte(strVal), &parsed); err == nil {
+					value = DecodeTransitValueTransit(parsed)
+				}
+			}
+
+			result[key] = value
+		}
+		return result
+	}
+
+	// Regular array
+	return data
+}
+
 // MinimalTransitEncoder provides basic transit-JSON encoding
 type MinimalTransitEncoder struct{}
 
@@ -96,7 +154,7 @@ func (e *MinimalTransitEncoder) DecodeTransitLine(line string) (map[string]inter
 }
 
 func TestSimpleRecordsInsert(t *testing.T) {
-	conn := getConn(t)
+	conn := getConnTransit(t)
 	defer conn.Close(context.Background())
 
 	table := getCleanTable()
@@ -141,7 +199,7 @@ func TestSimpleRecordsInsert(t *testing.T) {
 }
 
 func TestTransitJSONFormat(t *testing.T) {
-	conn := getConn(t)
+	conn := getConnTransit(t)
 	defer conn.Close(context.Background())
 
 	table := getCleanTable()
@@ -197,7 +255,7 @@ func TestTransitJSONFormat(t *testing.T) {
 }
 
 func TestTransitJSONParsing(t *testing.T) {
-	conn := getConn(t)
+	conn := getConnTransit(t)
 	defer conn.Close(context.Background())
 
 	table := getCleanTable()
@@ -297,13 +355,15 @@ func TestTransitJSONParsing(t *testing.T) {
 				t.Errorf("Expected email='alice@example.com', got %v", rowMap["email"])
 			}
 
-			// Verify salary (float field)
-			if salary, ok := rowMap["salary"].(float64); !ok || salary != 125000.5 {
-				t.Errorf("Expected salary=125000.5, got %v", rowMap["salary"])
+			// Verify salary (float field) - May be transit-encoded, decode if needed
+			salaryDecoded := DecodeTransitValueTransit(rowMap["salary"])
+			if salary, ok := salaryDecoded.(float64); !ok || salary != 125000.5 {
+				t.Errorf("Expected salary=125000.5 (float64), got %v (type %T)", salaryDecoded, salaryDecoded)
 			}
 
-			// Verify nested array (tags)
+			// Verify nested array (tags) - With transit output format, properly typed
 			if tags, ok := rowMap["tags"].([]interface{}); ok {
+				t.Logf("✅ Tags properly typed as []interface{}: %v", tags)
 				if len(tags) != 2 {
 					t.Errorf("Expected 2 tags, got %d", len(tags))
 				} else {
@@ -312,16 +372,43 @@ func TestTransitJSONParsing(t *testing.T) {
 					}
 				}
 			} else {
-				t.Errorf("Expected tags to be array, got %T", rowMap["tags"])
+				t.Errorf("Expected tags to be []interface{}, got %T: %v", rowMap["tags"], rowMap["tags"])
 			}
 
-			// Verify nested object (metadata) exists
-			if metadata, ok := rowMap["metadata"].(map[string]interface{}); ok {
-				if metadata == nil {
-					t.Error("Expected metadata to exist")
+			// Verify nested object (metadata) - May be transit-encoded, decode if needed
+			metadataDecoded := DecodeTransitValueTransit(rowMap["metadata"])
+			if metadata, ok := metadataDecoded.(map[string]interface{}); ok {
+				t.Logf("✅ Metadata properly typed as map[string]interface{}: %v", metadata)
+
+				// Validate metadata fields
+				if dept, ok := metadata["department"].(string); !ok || dept != "Engineering" {
+					t.Errorf("Expected department='Engineering', got %v (type %T)", metadata["department"], metadata["department"])
+				}
+
+				// Level might be float64 or int from JSON parsing
+				var level int64
+				switch v := metadata["level"].(type) {
+				case float64:
+					level = int64(v)
+				case int64:
+					level = v
+				case int32:
+					level = int64(v)
+				default:
+					t.Errorf("Expected level to be numeric, got %T: %v", metadata["level"], metadata["level"])
+				}
+				if level != 5 {
+					t.Errorf("Expected level=5, got %d", level)
+				}
+
+				// Joined date - should be present
+				if metadata["joined"] == nil {
+					t.Error("Expected joined field in metadata")
+				} else {
+					t.Logf("Joined date: %v (type: %T)", metadata["joined"], metadata["joined"])
 				}
 			} else {
-				t.Logf("Metadata is type %T: %v", rowMap["metadata"], rowMap["metadata"])
+				t.Errorf("Expected metadata to be map[string]interface{}, got %T: %v", rowMap["metadata"], rowMap["metadata"])
 			}
 		}
 	}
@@ -336,7 +423,7 @@ func TestTransitJSONParsing(t *testing.T) {
 /*
 func TestTransitJSONParsingOriginal(t *testing.T) {
 	// Original test that unmarshalls the transit data:
-	conn := getConn(t)
+	conn := getConnTransit(t)
 	defer conn.Close(context.Background())
 
 	table := getCleanTable()
@@ -422,7 +509,7 @@ func TestTransitJSONParsingOriginal(t *testing.T) {
 */
 
 func TestTransitJSONWithDate(t *testing.T) {
-	conn := getConn(t)
+	conn := getConnTransit(t)
 	defer conn.Close(context.Background())
 
 	table := getCleanTable()

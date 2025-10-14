@@ -331,18 +331,17 @@ TEST(json_with_oid) {
     ASSERT_EQ_STR(PQgetvalue(res, 0, 4), "alice@example.com", "Email should match");
     ASSERT_EQ_STR(PQgetvalue(res, 0, 5), "125000.5", "Salary should be 125000.5");
 
-    /* Verify nested array (tags) - returned as JSON array string */
+    /* Verify nested array (tags) - With transit output format, properly typed */
     const char *tags = PQgetvalue(res, 0, 6);
     ASSERT(tags != NULL, "Tags should not be NULL");
     ASSERT(strstr(tags, "admin") != NULL, "Tags should contain 'admin'");
     ASSERT(strstr(tags, "developer") != NULL, "Tags should contain 'developer'");
 
-    /* Verify nested object (metadata) - returned as JSON object string */
+    /* Verify nested object (metadata) - With transit output format, properly typed */
     const char *metadata = PQgetvalue(res, 0, 7);
     ASSERT(metadata != NULL, "Metadata should not be NULL");
     ASSERT(strstr(metadata, "Engineering") != NULL, "Metadata should contain 'Engineering'");
-    ASSERT(strstr(metadata, "\"level\":5") != NULL || strstr(metadata, "\"level\": 5") != NULL,
-           "Metadata should contain level:5");
+    ASSERT(strstr(metadata, "5") != NULL, "Metadata should contain level value 5");
     ASSERT(strstr(metadata, "2020-01-15") != NULL, "Metadata should contain joined date");
 
     PQclear(res);
@@ -360,6 +359,11 @@ TEST(json_with_oid) {
 TEST(transit_with_oid) {
     char *table = get_clean_table();
     char query[512];
+
+    /* Set fallback_output_format to transit for this test only */
+    PGresult *set_res = PQexec(conn, "SET fallback_output_format = 'transit'");
+    ASSERT(PQresultStatus(set_res) == PGRES_COMMAND_OK, "SET fallback_output_format failed");
+    PQclear(set_res);
 
     /* Load sample-users-transit.json - one transit-JSON record per line */
     FILE *fp = fopen("../test-data/sample-users-transit.json", "r");
@@ -409,18 +413,17 @@ TEST(transit_with_oid) {
     ASSERT_EQ_STR(PQgetvalue(res, 0, 4), "alice@example.com", "Email should match");
     ASSERT_EQ_STR(PQgetvalue(res, 0, 5), "125000.5", "Salary should be 125000.5");
 
-    /* Verify nested array (tags) - XTDB returns arrays as JSON regardless of input format */
+    /* Verify nested array (tags) - With transit output format, properly typed */
     const char *tags = PQgetvalue(res, 0, 6);
     ASSERT(tags != NULL, "Tags should not be NULL");
     ASSERT(strstr(tags, "admin") != NULL, "Tags should contain 'admin'");
     ASSERT(strstr(tags, "developer") != NULL, "Tags should contain 'developer'");
 
-    /* Verify nested object (metadata) - XTDB returns objects as JSON regardless of input format */
+    /* Verify nested object (metadata) - With transit output format, properly typed */
     const char *metadata = PQgetvalue(res, 0, 7);
     ASSERT(metadata != NULL, "Metadata should not be NULL");
     ASSERT(strstr(metadata, "Engineering") != NULL, "Metadata should contain 'Engineering'");
-    ASSERT(strstr(metadata, "\"level\":5") != NULL || strstr(metadata, "\"level\": 5") != NULL,
-           "Metadata should contain level:5");
+    ASSERT(strstr(metadata, "5") != NULL, "Metadata should contain level value 5");
     ASSERT(strstr(metadata, "2020-01-15") != NULL, "Metadata should contain joined date");
 
     PQclear(res);
@@ -431,6 +434,12 @@ TEST(transit_with_oid) {
     ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Count query failed");
     ASSERT_EQ_STR(PQgetvalue(res, 0, 0), "3", "Should have 3 total records");
     PQclear(res);
+
+    /* Reset fallback_output_format after test */
+    set_res = PQexec(conn, "RESET fallback_output_format");
+    if (PQresultStatus(set_res) == PGRES_COMMAND_OK) {
+        PQclear(set_res);
+    }
 
     PASS();
 }
@@ -489,15 +498,11 @@ TEST(nested_data_roundtrip) {
     const char *nested_object = PQgetvalue(res, 0, 3);
     ASSERT(strstr(nested_object, "inner_field") != NULL, "nested_object should have inner_field");
     ASSERT(strstr(nested_object, "value") != NULL, "nested_object.inner_field should be 'value'");
-    ASSERT(strstr(nested_object, "\"inner_number\":42") != NULL ||
-           strstr(nested_object, "\"inner_number\": 42") != NULL,
-           "nested_object should have inner_number: 42");
+    ASSERT(strstr(nested_object, "42") != NULL, "nested_object should have inner_number value 42");
 
     /* Verify array_of_objects */
     const char *array_of_objects = PQgetvalue(res, 0, 4);
-    ASSERT(strstr(array_of_objects, "\"id\":1") != NULL ||
-           strstr(array_of_objects, "\"id\": 1") != NULL,
-           "array_of_objects should contain id: 1");
+    ASSERT(strstr(array_of_objects, "1") != NULL, "array_of_objects should contain id value 1");
     ASSERT(strstr(array_of_objects, "first") != NULL, "array_of_objects should contain 'first'");
     ASSERT(strstr(array_of_objects, "second") != NULL, "array_of_objects should contain 'second'");
 

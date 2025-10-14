@@ -1,11 +1,29 @@
 defmodule XTDBTest do
   use ExUnit.Case
 
+  # Custom types module that includes the transit extension (for transit tests only)
+  Postgrex.Types.define(
+    XTDBTest.TransitTypes,
+    [TransitExtension],
+    []
+  )
+
+  # Standard config for JSON and basic tests (no transit fallback)
   @db_config [
     hostname: "xtdb",
     port: 5432,
     database: "xtdb",
     username: "xtdb"
+  ]
+
+  # Transit config for transit-specific tests only
+  @db_config_transit [
+    hostname: "xtdb",
+    port: 5432,
+    database: "xtdb",
+    username: "xtdb",
+    parameters: [fallback_output_format: "transit"],
+    types: XTDBTest.TransitTypes
   ]
 
   defp get_clean_table do
@@ -196,14 +214,26 @@ defmodule XTDBTest do
     assert row_map["email"] == "alice@example.com"
     assert row_map["salary"] == 125000.5
 
-    # Verify nested array (tags)
-    assert is_list(row_map["tags"])
+    # Verify nested array (tags) - With transit output format, properly typed
+    assert is_list(row_map["tags"]), "Tags should be a list"
     assert length(row_map["tags"]) == 2
     assert "admin" in row_map["tags"]
     assert "developer" in row_map["tags"]
+    IO.puts("✅ Tags properly typed as list: #{inspect(row_map["tags"])}")
 
-    # Verify nested object (metadata) exists
-    assert is_map(row_map["metadata"])
+    # Verify nested object (metadata) - With transit output format, properly typed
+    assert is_map(row_map["metadata"]), "Metadata should be a map"
+    metadata = row_map["metadata"]
+
+    # Validate metadata fields
+    assert metadata["department"] == "Engineering",
+      "Expected department='Engineering', got #{inspect(metadata["department"])}"
+    assert metadata["level"] == 5,
+      "Expected level=5, got #{inspect(metadata["level"])}"
+    assert is_binary(metadata["joined"]) or is_map(metadata["joined"]),
+      "Expected joined field to be present"
+
+    IO.puts("✅ Metadata properly typed as map: #{inspect(metadata)}")
 
     GenServer.stop(pid)
   end
@@ -235,7 +265,7 @@ defmodule XTDBTest do
   end
 
   test "parse transit json" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(@db_config_transit)
     table = get_clean_table()
 
     # Load sample-users-transit.json
@@ -280,14 +310,30 @@ defmodule XTDBTest do
     assert row_map["email"] == "alice@example.com"
     assert row_map["salary"] == 125000.5
 
-    # Verify nested array (tags)
-    assert is_list(row_map["tags"])
+    # Verify nested array (tags) - With transit output format, properly typed
+    assert is_list(row_map["tags"]), "Tags should be a list"
     assert length(row_map["tags"]) == 2
     assert "admin" in row_map["tags"]
     assert "developer" in row_map["tags"]
+    IO.puts("✅ Tags properly typed as list: #{inspect(row_map["tags"])}")
 
-    # Verify nested object (metadata) exists
-    assert is_map(row_map["metadata"])
+    # Verify nested object (metadata) - With transit output format, properly typed
+    assert is_map(row_map["metadata"]), "Metadata should be a map"
+    metadata = row_map["metadata"]
+
+    # Validate metadata fields
+    assert metadata["department"] == "Engineering",
+      "Expected department='Engineering', got #{inspect(metadata["department"])}"
+    assert metadata["level"] == 5,
+      "Expected level=5, got #{inspect(metadata["level"])}"
+
+    # Validate joined date field - with transit output format, temporal types are properly decoded
+    assert is_binary(metadata["joined"]),
+      "Expected joined to be a string, got #{inspect(metadata["joined"])}"
+    assert String.contains?(metadata["joined"], "2020-01-15"),
+      "Expected joined to contain date 2020-01-15, got #{inspect(metadata["joined"])}"
+
+    IO.puts("✅ Metadata properly typed as map with decoded temporal types: #{inspect(metadata)}")
 
     GenServer.stop(pid)
   end

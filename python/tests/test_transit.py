@@ -32,6 +32,62 @@ class TransitDumper(Dumper):
         return obj.encode('utf-8')
 
 
+class TransitDecoder:
+    """Decode transit-JSON strings to Python objects."""
+
+    @staticmethod
+    def decode(value):
+        """Decode a value that might be transit-JSON."""
+        if not isinstance(value, str):
+            return value
+
+        # Try to parse as JSON first
+        try:
+            data = json.loads(value)
+            return TransitDecoder.decode_value(data)
+        except (json.JSONDecodeError, ValueError):
+            return value
+
+    @staticmethod
+    def decode_value(data):
+        """Recursively decode transit-JSON structures."""
+        if isinstance(data, list):
+            if len(data) > 0 and data[0] == "^ ":
+                # Transit map: ["^ ", key1, val1, key2, val2, ...]
+                return TransitDecoder.decode_map(data)
+            elif len(data) == 2 and isinstance(data[0], str) and data[0].startswith('~#'):
+                # Transit tagged value: ["~#tag", value]
+                # For dates like ["~#time/zoned-date-time", "2020-01-15T00:00Z[UTC]"]
+                # Extract just the ISO date string
+                return data[1]
+            else:
+                # Regular array
+                return [TransitDecoder.decode_value(item) for item in data]
+        elif isinstance(data, str):
+            if data.startswith('~:'):
+                # Keyword - remove prefix
+                return data[2:]
+            elif data.startswith('~t'):
+                # Date - remove prefix
+                return data[2:]
+            else:
+                return data
+        else:
+            return data
+
+    @staticmethod
+    def decode_map(data):
+        """Decode a transit map: ["^ ", k1, v1, k2, v2, ...]"""
+        result = {}
+        i = 1
+        while i < len(data):
+            key = TransitDecoder.decode_value(data[i])
+            value = TransitDecoder.decode_value(data[i + 1]) if i + 1 < len(data) else None
+            result[key] = value
+            i += 2
+        return result
+
+
 class MinimalTransitEncoder:
     """Minimal transit-JSON encoder for basic types."""
 
@@ -175,7 +231,7 @@ async def test_records_syntax(conn, clean_table):
     assert result[2] == 100
 
 @pytest.mark.asyncio
-async def test_transit_verify_with_unmarshalling(conn, clean_table):
+async def test_transit_verify_with_unmarshalling(conn_transit, clean_table_transit):
     """
     Verify the OID 16384 approach by parsing and comparing transit-JSON.
 
@@ -190,16 +246,17 @@ async def test_transit_verify_with_unmarshalling(conn, clean_table):
     - Nested objects (metadata with dates)
 
     Note: Uses a custom transit-JSON parser (no external transit library needed for reading).
+    Uses conn_transit with fallback_output_format=transit for proper nested data typing.
     """
     import os
     import json
     from datetime import date
 
-    table = clean_table
+    table = clean_table_transit
     test_data_path = os.path.join(os.path.dirname(__file__), "../../test-data/sample-users-transit.json")
 
     # Register transit dumper for string type
-    conn.adapters.register_dumper(str, TransitDumper)
+    conn_transit.adapters.register_dumper(str, TransitDumper)
 
     with open(test_data_path) as f:
         lines = f.readlines()
@@ -247,13 +304,13 @@ async def test_transit_verify_with_unmarshalling(conn, clean_table):
         original_data.append(parsed_dict)
 
         # Insert using OID 16384 - raw transit-JSON string
-        await conn.execute(
+        await conn_transit.execute(
             f"INSERT INTO {table} RECORDS %s",
             (line,)
         )
 
     # Step 2: Query back ALL the data including nested fields
-    cursor = await conn.execute(
+    cursor = await conn_transit.execute(
         f"SELECT _id, name, age, active, email, salary, tags, metadata FROM {table} ORDER BY _id"
     )
     rows = await cursor.fetchall()
@@ -282,20 +339,28 @@ async def test_transit_verify_with_unmarshalling(conn, clean_table):
         # Verify float field
         assert row[5] == original.get('salary'), f"salary mismatch: {row[5]} != {original.get('salary')}"
 
-        # Verify nested array (tags)
+        # Verify nested array (tags) - With transit output format, properly typed
         tags_from_db = row[6]
         tags_from_transit = original.get('tags')
         print(f"   Nested array (tags):")
-        print(f"     From DB:      {tags_from_db}")
-        print(f"     From transit: {tags_from_transit}")
+        print(f"     From DB:      {tags_from_db} (type: {type(tags_from_db).__name__})")
+        print(f"     From transit: {tags_from_transit} (type: {type(tags_from_transit).__name__})")
+
+        # Validate it's a proper list, not a string
+        assert isinstance(tags_from_db, list), f"tags should be list, got {type(tags_from_db)}"
         assert tags_from_db == tags_from_transit, f"tags mismatch"
 
-        # Verify nested object (metadata)
-        metadata_from_db = row[7]
+        # Verify nested object (metadata) - With transit output format, decode transit string
+        metadata_from_db_raw = row[7]
+        metadata_from_db = TransitDecoder.decode(metadata_from_db_raw)
         metadata_from_transit = original.get('metadata')
         print(f"   Nested object (metadata):")
-        print(f"     From DB:      {metadata_from_db}")
-        print(f"     From transit: {metadata_from_transit}")
+        print(f"     From DB (raw):     {metadata_from_db_raw} (type: {type(metadata_from_db_raw).__name__})")
+        print(f"     From DB (decoded): {metadata_from_db} (type: {type(metadata_from_db).__name__})")
+        print(f"     From transit:      {metadata_from_transit} (type: {type(metadata_from_transit).__name__})")
+
+        # Validate it's a proper dict after decoding
+        assert isinstance(metadata_from_db, dict), f"metadata should be dict after decoding, got {type(metadata_from_db)}"
 
         # Compare metadata fields
         assert metadata_from_db.get('department') == metadata_from_transit.get('department')

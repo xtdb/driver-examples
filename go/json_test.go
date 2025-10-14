@@ -155,13 +155,14 @@ func TestJSONLoadSampleData(t *testing.T) {
 				t.Errorf("Expected email='alice@example.com', got %v", rowMap["email"])
 			}
 
-			// Verify salary (float field)
+			// Verify salary (float field) - should be native float64
 			if salary, ok := rowMap["salary"].(float64); !ok || salary != 125000.5 {
-				t.Errorf("Expected salary=125000.5, got %v", rowMap["salary"])
+				t.Errorf("Expected salary=125000.5 (float64), got %v (type %T)", rowMap["salary"], rowMap["salary"])
 			}
 
-			// Verify nested array (tags)
+			// Verify nested array (tags) - should be native []interface{}
 			if tags, ok := rowMap["tags"].([]interface{}); ok {
+				t.Logf("✅ Tags properly typed as []interface{}: %v", tags)
 				if len(tags) != 2 {
 					t.Errorf("Expected 2 tags, got %d", len(tags))
 				} else {
@@ -170,16 +171,42 @@ func TestJSONLoadSampleData(t *testing.T) {
 					}
 				}
 			} else {
-				t.Errorf("Expected tags to be array, got %T", rowMap["tags"])
+				t.Errorf("Expected tags to be []interface{}, got %T: %v", rowMap["tags"], rowMap["tags"])
 			}
 
-			// Verify nested object (metadata) exists
+			// Verify nested object (metadata) - should be native map[string]interface{}
 			if metadata, ok := rowMap["metadata"].(map[string]interface{}); ok {
-				if metadata == nil {
-					t.Error("Expected metadata to exist")
+				t.Logf("✅ Metadata properly typed as map[string]interface{}: %v", metadata)
+
+				// Validate metadata fields
+				if dept, ok := metadata["department"].(string); !ok || dept != "Engineering" {
+					t.Errorf("Expected department='Engineering', got %v (type %T)", metadata["department"], metadata["department"])
+				}
+
+				// Level might be float64 or int from JSON parsing
+				var level int64
+				switch v := metadata["level"].(type) {
+				case float64:
+					level = int64(v)
+				case int64:
+					level = v
+				case int32:
+					level = int64(v)
+				default:
+					t.Errorf("Expected level to be numeric, got %T: %v", metadata["level"], metadata["level"])
+				}
+				if level != 5 {
+					t.Errorf("Expected level=5, got %d", level)
+				}
+
+				// Joined date - should be a string
+				if joined, ok := metadata["joined"].(string); !ok {
+					t.Errorf("Expected joined to be string, got %T: %v", metadata["joined"], metadata["joined"])
+				} else if joined != "2020-01-15" {
+					t.Errorf("Expected joined='2020-01-15', got %v", joined)
 				}
 			} else {
-				t.Logf("Metadata is type %T: %v", rowMap["metadata"], rowMap["metadata"])
+				t.Errorf("Expected metadata to be map[string]interface{}, got %T: %v", rowMap["metadata"], rowMap["metadata"])
 			}
 		}
 	}

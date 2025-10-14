@@ -3,6 +3,26 @@ import assert from "node:assert";
 import postgres from "postgres";
 import transit from "transit-js";
 
+// Helper to parse PostgreSQL array format: {val1,val2} to JavaScript array
+function parsePgArray(str) {
+  if (typeof str !== 'string') return str;
+  if (str.startsWith('{') && str.endsWith('}')) {
+    const content = str.slice(1, -1);
+    return content ? content.split(',') : [];
+  }
+  return str;
+}
+
+// Helper to parse transit-encoded values using transit-js
+function parseTransitValue(val) {
+  if (typeof val !== 'string') return val;
+  try {
+    return transitReader.read(val);
+  } catch {
+    return val;
+  }
+}
+
 const OID = {
   boolean: 16,
   int64: 20,
@@ -91,13 +111,46 @@ describe("Transit-JSON with RECORDS", () => {
       `;
     }
 
-    const result = await sql`SELECT _id, name, age, active FROM transit_samples ORDER BY _id`;
+    // Query back with ALL fields including nested data
+    const result = await sql`SELECT _id, name, age, active, email, salary, tags, metadata FROM transit_samples ORDER BY _id`;
 
     assert.strictEqual(result.length, 3);
-    assert.strictEqual(result[0]._id, "alice");
-    assert.strictEqual(result[0].name, "Alice Smith");
-    assert.strictEqual(result[0].age, 30);
-    assert.strictEqual(result[0].active, true);
+
+    // Verify alice record with nested data
+    const alice = result[0];
+    assert.strictEqual(alice._id, "alice");
+    assert.strictEqual(alice.name, "Alice Smith");
+    assert.strictEqual(alice.age, 30);
+    assert.strictEqual(alice.active, true);
+    assert.strictEqual(alice.email, "alice@example.com");
+    // Salary might be transit-encoded, parse with transit-js
+    const salaryParsed = parseTransitValue(alice.salary);
+    const salary = typeof salaryParsed === 'string' ? parseFloat(salaryParsed) : salaryParsed;
+    console.log(`Salary: ${alice.salary} -> ${salaryParsed} (type: ${typeof salary})`);
+    assert.ok(Math.abs(salary - 125000.5) < 0.01, `salary should match, got ${salary}`);
+
+    // Verify nested array (tags) - May come as PG array string, parse if needed
+    const tags = parsePgArray(alice.tags);
+    console.log(`Tags: ${JSON.stringify(alice.tags)} -> ${JSON.stringify(tags)} (type: ${typeof tags}, isArray: ${Array.isArray(tags)})`);
+    assert.ok(Array.isArray(tags), "tags should be an array after parsing");
+    assert.ok(tags.includes("admin"), "tags should include admin");
+    assert.ok(tags.includes("developer"), "tags should include developer");
+    assert.strictEqual(tags.length, 2);
+
+    // Verify nested object (metadata) - With transit output format, it's a transit Map
+    console.log(`Metadata: ${JSON.stringify(alice.metadata)} (type: ${typeof alice.metadata})`);
+    assert.strictEqual(typeof alice.metadata, "object", "metadata should be an object");
+
+    // Transit Map objects use .get() method to access values
+    const department = alice.metadata.get ? alice.metadata.get("department") : alice.metadata.department;
+    const level = alice.metadata.get ? alice.metadata.get("level") : alice.metadata.level;
+    const joined = alice.metadata.get ? alice.metadata.get("joined") : alice.metadata.joined;
+
+    assert.strictEqual(department, "Engineering");
+    assert.strictEqual(level, 5);
+    // Date may be transit date object, convert to string for comparison
+    const joinedStr = String(joined);
+    assert.ok(joinedStr.includes("2020-01-15"), `joined date should match, got ${joinedStr}`);
   });
 
   it("should insert typed values using VALUES syntax", async () => {
