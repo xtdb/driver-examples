@@ -8,7 +8,8 @@ RSpec.describe "JSON Operations" do
     if str.start_with?('{') && str.end_with?('}')
       content = str[1..-2]
       return [] if content.empty?
-      content.split(',')
+      # Split by comma and strip quotes from each element
+      content.split(',').map { |v| v.strip.gsub(/^"|"$/, '') }
     else
       str
     end

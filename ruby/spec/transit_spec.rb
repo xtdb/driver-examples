@@ -64,8 +64,8 @@ class TransitDecoder
     content = str[1...-1]
     return [] if content.empty?
 
-    # Split by comma (simple parsing, doesn't handle nested arrays with commas)
-    content.split(',').map(&:strip)
+    # Split by comma and strip quotes from each element
+    content.split(',').map { |v| v.strip.gsub(/^"|"$/, '') }
   end
 
   def self.decode_value(data)
