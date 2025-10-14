@@ -8,7 +8,8 @@ function parsePgArray(str) {
   if (typeof str !== 'string') return str;
   if (str.startsWith('{') && str.endsWith('}')) {
     const content = str.slice(1, -1);
-    return content ? content.split(',') : [];
+    // Split by comma and strip quotes from each element
+    return content ? content.split(',').map(v => v.trim().replace(/^"|"$/g, '')) : [];
   }
   return str;
 }
