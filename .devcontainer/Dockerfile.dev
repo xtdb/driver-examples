@@ -2,7 +2,7 @@
 FROM archlinux:base
 
 # Copy and run shared dependency installation script
-COPY install-system-deps.sh /tmp/install-system-deps.sh
+COPY .devcontainer/install-system-deps.sh /tmp/install-system-deps.sh
 RUN chmod +x /tmp/install-system-deps.sh && \
     /tmp/install-system-deps.sh all && \
     rm /tmp/install-system-deps.sh
@@ -15,7 +15,7 @@ RUN useradd -m -s /bin/bash -u 1000 codespace && \
 USER codespace
 WORKDIR /home/codespace
 
-COPY --chown=codespace:codespace setup-mise.sh /tmp/setup-mise.sh
+COPY --chown=codespace:codespace .devcontainer/setup-mise.sh /tmp/setup-mise.sh
 RUN chmod +x /tmp/setup-mise.sh && \
     /tmp/setup-mise.sh codespace /workspaces/driver-examples && \
     rm /tmp/setup-mise.sh
@@ -32,7 +32,7 @@ RUN cd /tmp && \
     rm /tmp/.tool-versions
 
 # Install language-specific tools (Clojure, Elixir, PHP Composer)
-COPY --chown=codespace:codespace setup-language-tools.sh /tmp/setup-language-tools.sh
+COPY --chown=codespace:codespace .devcontainer/setup-language-tools.sh /tmp/setup-language-tools.sh
 RUN chmod +x /tmp/setup-language-tools.sh && \
     /tmp/setup-language-tools.sh all && \
     rm /tmp/setup-language-tools.sh

@@ -13,8 +13,19 @@ echo "Workspace path: $WORKSPACE_PATH"
 # Install mise
 curl https://mise.run | sh
 
-# Activate mise in bash
-echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
+# Activate mise in bash (add at the TOP of .bashrc so it runs for non-interactive shells too)
+# This ensures mise is available in all contexts (interactive terminals, CI, VS Code, etc.)
+if ! grep -q "mise activate bash" ~/.bashrc 2>/dev/null; then
+    # Create a temporary file with mise activation at the top
+    {
+        echo '# Activate mise BEFORE the interactive check so it'\''s available in all shells'
+        echo 'eval "$(~/.local/bin/mise activate bash)"'
+        echo 'eval "$(~/.local/bin/mise activate bash --shims)"'
+        echo ''
+        cat ~/.bashrc 2>/dev/null || true
+    } > ~/.bashrc.tmp
+    mv ~/.bashrc.tmp ~/.bashrc
+fi
 
 # Activate mise in fish (if available)
 if command -v fish &> /dev/null; then
