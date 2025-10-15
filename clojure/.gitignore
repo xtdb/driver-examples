@@ -1,0 +1,20 @@
+# Build artifacts
+target/
+classes/
+.nrepl-port
+.cpcache/
+
+# Leiningen
+.lein-*
+pom.xml
+pom.xml.asc
+
+# IDE
+.vscode/
+.idea/
+.calva/
+.clj-kondo/.cache/
+
+# OS
+.DS_Store
+Thumbs.db

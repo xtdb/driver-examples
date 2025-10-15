@@ -4,21 +4,49 @@
 depends = ["run"]
 
 [tasks.setup]
-description = "Install PHP and pgsql extension if needed"
+description = "Install PHP and ext-pq (PECL pq) extension"
 run = """
+# Install PHP if not present
 if ! command -v php &> /dev/null; then
-  echo "Installing PHP and php-pgsql extension..."
-  sudo pacman -S --noconfirm php php-pgsql
-elif ! php -m | grep -q pgsql; then
-  echo "Installing php-pgsql extension..."
-  sudo pacman -S --noconfirm php-pgsql
+  echo "Installing PHP..."
+  sudo pacman -S --noconfirm php
 fi
 
-# Enable pgsql extension if not already enabled
-if ! php -m | grep -q pgsql; then
-  echo "Enabling pgsql extension..."
-  echo "extension=pgsql" | sudo tee /etc/php/conf.d/pgsql.ini > /dev/null
-  echo "extension=pdo_pgsql" | sudo tee -a /etc/php/conf.d/pgsql.ini > /dev/null
+# Install development tools needed for ext-pq compilation
+if ! pacman -Q base-devel &> /dev/null; then
+  echo "Installing build tools (base-devel)..."
+  sudo pacman -S --noconfirm base-devel
+fi
+
+# Install PostgreSQL client libraries (required by ext-pq)
+if ! pacman -Q postgresql-libs &> /dev/null; then
+  echo "Installing PostgreSQL client libraries..."
+  sudo pacman -S --noconfirm postgresql-libs
+fi
+
+# Check if ext-pq is available in Arch repos
+if pacman -Ss php-pq | grep -q "php-pq"; then
+  echo "Installing ext-pq from Arch repos..."
+  sudo pacman -S --noconfirm php-pq
+elif ! php -m | grep -q pq; then
+  echo "ext-pq not available in repos, would need to compile from source"
+  echo "For now, skipping ext-pq installation - tests will be skipped"
+  echo "To manually install: git clone https://github.com/m6w6/ext-pq && cd ext-pq && phpize && ./configure && make && sudo make install"
+fi
+
+# Enable pq extension if installed
+if [ -f /usr/lib/php/modules/pq.so ] || [ -f /usr/local/lib/php/extensions/*/pq.so ]; then
+  if ! php -m | grep -q pq; then
+    echo "Enabling pq extension..."
+    echo "extension=pq.so" | sudo tee /etc/php/conf.d/pq.ini > /dev/null
+  fi
+fi
+
+# Verify ext-pq is loaded
+if php -m | grep -q pq; then
+  echo "✓ ext-pq successfully installed and enabled"
+else
+  echo "⚠ ext-pq not available - some tests will be skipped"
 fi
 """
 

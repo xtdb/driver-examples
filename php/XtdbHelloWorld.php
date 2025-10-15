@@ -1,44 +1,29 @@
 <?php
 
-// Connect to XTDB using PostgreSQL driver
-$connection_string = "host=xtdb port=5432 dbname=xtdb user=xtdb password=xtdb";
-$connection = pg_connect($connection_string);
-
-if (!$connection) {
-    die("Connection failed: " . pg_last_error());
-}
+// Connect to XTDB using ext-pq (PECL pq) driver
+// This gives us the ability to specify parameter OIDs for custom types
+use pq\Connection;
 
 try {
+    // Connect to XTDB
+    $connection = new Connection("host=xtdb port=5432 dbname=xtdb user=xtdb password=");
+
     // Insert records using XTDB's RECORDS syntax
     $insert_query = "INSERT INTO users RECORDS {_id: 'jms', name: 'James'}, {_id: 'joe', name: 'Joe'}";
-    $insert_result = pg_query($connection, $insert_query);
-
-    if (!$insert_result) {
-        throw new Exception("Insert failed: " . pg_last_error($connection));
-    }
+    $connection->exec($insert_query);
 
     // Query the table and print results
-    $select_query = "SELECT * FROM users";
-    $result = pg_query($connection, $select_query);
-
-    if (!$result) {
-        throw new Exception("Query failed: " . pg_last_error($connection));
-    }
+    $result = $connection->exec("SELECT * FROM users");
 
     echo "Users:\n";
 
-    while ($row = pg_fetch_assoc($result)) {
+    while ($row = $result->fetchRow(\pq\Result::FETCH_ASSOC)) {
         echo "  * " . $row['_id'] . ": " . $row['name'] . "\n";
     }
 
-    // Free result
-    pg_free_result($result);
-
-} catch (Exception $e) {
+} catch (\pq\Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
-} finally {
-    // Close connection
-    pg_close($connection);
+    exit(1);
 }
 
 ?>

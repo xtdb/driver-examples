@@ -1,0 +1,13 @@
+# Build artifacts
+.cpcache/
+.nrepl-port
+
+# IDE
+.vscode/
+.idea/
+.calva/
+.clj-kondo/.cache/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -32,7 +32,6 @@ LANGUAGE_PACKAGES=(
     erlang-inets
     erlang-parsetools
     php
-    php-pgsql
 )
 
 # PostgreSQL client (for testing)

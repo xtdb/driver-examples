@@ -1,0 +1,18 @@
+# Build artifacts
+_build/
+deps/
+*.ez
+
+# Mix
+mix.lock
+*.beam
+erl_crash.dump
+
+# IDE
+.vscode/
+.idea/
+.elixir_ls/
+
+# OS
+.DS_Store
+Thumbs.db

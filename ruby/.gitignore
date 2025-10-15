@@ -1,0 +1,15 @@
+# Dependencies
+vendor/bundle/
+.bundle/
+Gemfile.lock
+
+# Test coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
