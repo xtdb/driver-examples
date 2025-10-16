@@ -13,7 +13,9 @@ defmodule XTDBTest do
     hostname: "xtdb",
     port: 5432,
     database: "xtdb",
-    username: "xtdb"
+    username: "xtdb",
+    queue_target: 10000, # mitigation for https://github.com/xtdb/xtdb/issues/4878
+    queue_interval: 10000
   ]
 
   # Transit config for transit-specific tests only
@@ -23,7 +25,9 @@ defmodule XTDBTest do
     database: "xtdb",
     username: "xtdb",
     parameters: [fallback_output_format: "transit"],
-    types: XTDBTest.TransitTypes
+    types: XTDBTest.TransitTypes,
+    queue_target: 10000, # mitigation for https://github.com/xtdb/xtdb/issues/4878
+    queue_interval: 10000
   ]
 
   defp get_clean_table do
