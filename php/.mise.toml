@@ -24,14 +24,44 @@ if ! pacman -Q postgresql-libs &> /dev/null; then
   sudo pacman -S --noconfirm postgresql-libs
 fi
 
-# Check if ext-pq is available in Arch repos
-if pacman -Ss php-pq | grep -q "php-pq"; then
-  echo "Installing ext-pq from Arch repos..."
-  sudo pacman -S --noconfirm php-pq
-elif ! php -m | grep -q pq; then
-  echo "ext-pq not available in repos, would need to compile from source"
-  echo "For now, skipping ext-pq installation - tests will be skipped"
-  echo "To manually install: git clone https://github.com/m6w6/ext-pq && cd ext-pq && phpize && ./configure && make && sudo make install"
+# Enable required PHP extensions
+if ! php -m | grep -q iconv; then
+  echo "Enabling iconv extension..."
+  sudo sed -i 's/;extension=iconv/extension=iconv/' /etc/php/php.ini
+fi
+
+# Install ext-pq using PECL
+if ! php -m | grep -q pq; then
+  echo "Installing ext-pq via PECL..."
+
+  # Install PECL if not available
+  if ! command -v pecl &> /dev/null; then
+    echo "Installing PEAR/PECL..."
+    curl -sS https://pear.php.net/go-pear.phar -o /tmp/go-pear.phar
+    echo "" | php /tmp/go-pear.phar
+    export PATH="$HOME/pear/bin:$PATH"
+    rm /tmp/go-pear.phar
+  fi
+
+  # Add pecl to PATH if it's in ~/pear/bin
+  if [ -f "$HOME/pear/bin/pecl" ]; then
+    export PATH="$HOME/pear/bin:$PATH"
+  fi
+
+  # Get pecl path
+  PECL_BIN="$HOME/pear/bin/pecl"
+
+  # Install raphf dependency first
+  if ! php -m | grep -q raphf; then
+    echo "Installing raphf extension (required by ext-pq)..."
+    sudo "$PECL_BIN" install raphf
+    echo "extension=raphf" | sudo tee /etc/php/conf.d/raphf.ini > /dev/null
+  fi
+
+  # Install ext-pq
+  sudo "$PECL_BIN" install pq
+
+  echo "✓ ext-pq installed via PECL"
 fi
 
 # Enable pq extension if installed
