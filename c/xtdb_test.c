@@ -668,6 +668,59 @@ TEST(transit_json_encoding) {
     PASS();
 }
 
+TEST(transit_msgpack_copy_from) {
+    char *table = get_clean_table();
+    char query[512];
+
+    /* Load transit-msgpack file (binary) */
+    FILE *fp = fopen("../test-data/sample-users-transit.msgpack", "rb");
+    ASSERT(fp != NULL, "Failed to open msgpack file");
+
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    char *msgpack_data = malloc(file_size);
+    size_t bytes_read = fread(msgpack_data, 1, file_size, fp);
+    fclose(fp);
+    ASSERT(bytes_read == file_size, "Failed to read msgpack file");
+
+    /* Use COPY FROM STDIN with transit-msgpack format */
+    snprintf(query, sizeof(query),
+             "COPY %s FROM STDIN WITH (FORMAT 'transit-msgpack')", table);
+
+    PGresult *res = PQexec(conn, query);
+    ASSERT(PQresultStatus(res) == PGRES_COPY_IN, "COPY command failed");
+    PQclear(res);
+
+    /* Send the msgpack data */
+    int result = PQputCopyData(conn, msgpack_data, file_size);
+    ASSERT(result == 1, "PQputCopyData failed");
+
+    result = PQputCopyEnd(conn, NULL);
+    ASSERT(result == 1, "PQputCopyEnd failed");
+
+    /* Get the result */
+    res = PQgetResult(conn);
+    ASSERT(PQresultStatus(res) == PGRES_COMMAND_OK, "COPY completion failed");
+    PQclear(res);
+
+    free(msgpack_data);
+
+    /* Query back and verify */
+    snprintf(query, sizeof(query), "SELECT _id, name, age FROM %s ORDER BY _id", table);
+    res = PQexec(conn, query);
+
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Select failed");
+    ASSERT(PQntuples(res) == 3, "Expected 3 records");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 0), "alice", "_id should be alice");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 1), "Alice Smith", "Name should be Alice Smith");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 2), "30", "Age should be 30");
+
+    PQclear(res);
+    PASS();
+}
+
 int main(void) {
     srand(time(NULL));
 
@@ -697,6 +750,7 @@ int main(void) {
     RUN_TEST(nested_data_roundtrip);
     RUN_TEST(transit_json_format);
     RUN_TEST(transit_json_encoding);
+    RUN_TEST(transit_msgpack_copy_from);
 
     PQfinish(conn);
 

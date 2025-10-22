@@ -267,6 +267,43 @@ public class XtdbTest {
     }
 
     @Test
+    void testParseTransitMsgpack() throws Exception {
+        String table = getCleanTable();
+
+        // Load transit-msgpack file (binary)
+        String msgpackPath = "../test-data/sample-users-transit.msgpack";
+        byte[] msgpackData = Files.readAllBytes(Paths.get(msgpackPath));
+
+        // Use COPY FROM STDIN with transit-msgpack format
+        org.postgresql.PGConnection pgConn = connection.unwrap(org.postgresql.PGConnection.class);
+        org.postgresql.copy.CopyManager copyManager = pgConn.getCopyAPI();
+
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(msgpackData)) {
+            copyManager.copyIn(
+                String.format("COPY %s FROM STDIN WITH (FORMAT 'transit-msgpack')", table),
+                bis
+            );
+        }
+
+        // Query back and verify
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                String.format("SELECT _id, name, age FROM %s ORDER BY _id", table))) {
+
+            int count = 0;
+            while (rs.next()) {
+                count++;
+                if (count == 1) {
+                    assertEquals("alice", rs.getString("_id"));
+                    assertEquals("Alice Smith", rs.getString("name"));
+                    assertEquals(30, rs.getInt("age"));
+                }
+            }
+            assertEquals(3, count);
+        }
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void testParseTransitJSON() throws Exception {
         String table = getCleanTable();

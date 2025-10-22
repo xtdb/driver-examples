@@ -244,6 +244,40 @@ class XtdbTest {
     }
 
     @Test
+    fun testParseTransitMsgpack() {
+        val table = getCleanTable()
+
+        // Load transit-msgpack file (binary)
+        val msgpackPath = "../test-data/sample-users-transit.msgpack"
+        val msgpackData = File(msgpackPath).readBytes()
+
+        // Use COPY FROM STDIN with transit-msgpack format
+        val pgConn = connection.unwrap(org.postgresql.PGConnection::class.java)
+        val copyManager = pgConn.copyAPI
+
+        copyManager.copyIn(
+            "COPY $table FROM STDIN WITH (FORMAT 'transit-msgpack')",
+            msgpackData.inputStream()
+        )
+
+        // Query back and verify
+        connection.createStatement().use { stmt ->
+            stmt.executeQuery("SELECT _id, name, age FROM $table ORDER BY _id").use { rs ->
+                var count = 0
+                while (rs.next()) {
+                    count++
+                    if (count == 1) {
+                        assertEquals("alice", rs.getString("_id"))
+                        assertEquals("Alice Smith", rs.getString("name"))
+                        assertEquals(30, rs.getInt("age"))
+                    }
+                }
+                assertEquals(3, count)
+            }
+        }
+    }
+
+    @Test
     fun testParseTransitJSON() {
         val table = getCleanTable()
 

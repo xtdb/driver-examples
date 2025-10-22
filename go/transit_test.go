@@ -570,6 +570,65 @@ func TestTransitJSONWithDate(t *testing.T) {
 	}
 }
 
+func TestTransitMsgpackCopyFrom(t *testing.T) {
+	conn := getConnTransit(t)
+	defer conn.Close(context.Background())
+
+	table := getCleanTable()
+
+	// Read the msgpack file as binary data
+	msgpackData, err := os.ReadFile("../test-data/sample-users-transit.msgpack")
+	if err != nil {
+		t.Fatalf("Failed to read msgpack file: %v", err)
+	}
+
+	// Use COPY FROM STDIN with transit-msgpack format
+	_, err = conn.PgConn().CopyFrom(
+		context.Background(),
+		strings.NewReader(string(msgpackData)),
+		fmt.Sprintf("COPY %s FROM STDIN WITH (FORMAT 'transit-msgpack')", table),
+	)
+	if err != nil {
+		t.Fatalf("COPY FROM failed: %v", err)
+	}
+
+	// Query back and verify - get ALL columns
+	rows, err := conn.Query(context.Background(),
+		fmt.Sprintf("SELECT * FROM %s ORDER BY _id", table))
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			t.Fatalf("Failed to get values: %v", err)
+		}
+		count++
+
+		if count == 1 {
+			// Verify first record has expected fields
+			fieldDescs := rows.FieldDescriptions()
+			rowMap := make(map[string]interface{})
+			for i, fd := range fieldDescs {
+				rowMap[string(fd.Name)] = values[i]
+			}
+
+			if rowMap["name"] != "Alice Smith" {
+				t.Errorf("Expected name='Alice Smith', got %v", rowMap["name"])
+			}
+		}
+	}
+
+	if count != 3 {
+		t.Errorf("Expected 3 records, got %d", count)
+	}
+
+	t.Logf("✅ Successfully tested transit-msgpack with COPY FROM! Loaded %d records from msgpack binary format", count)
+}
+
 func TestTransitNestOneFullRecord(t *testing.T) {
 	conn := getConnTransit(t)
 	defer conn.Close(context.Background())

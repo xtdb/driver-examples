@@ -398,6 +398,56 @@ async def test_transit_verify_with_unmarshalling(conn_transit, clean_table_trans
     print(f"\n💡 Note: Custom transit-JSON parser used (no external transit library needed!)")
 
 @pytest.mark.asyncio
+async def test_transit_msgpack_parsing(conn_transit, clean_table_transit):
+    """Test parsing sample-users-transit.msgpack file using COPY FROM with transit-msgpack format."""
+    import os
+
+    table = clean_table_transit
+    test_data_path = os.path.join(os.path.dirname(__file__), "../../test-data/sample-users-transit.msgpack")
+
+    # Read the msgpack file as binary data
+    with open(test_data_path, 'rb') as f:
+        msgpack_data = f.read()
+
+    # Use COPY FROM STDIN with transit-msgpack format
+    async with conn_transit.cursor() as cur:
+        # Start a COPY operation with transit-msgpack format
+        async with cur.copy(f"COPY {table} FROM STDIN WITH (FORMAT 'transit-msgpack')") as copy:
+            await copy.write(msgpack_data)
+
+    # Query back and verify - get ALL columns including nested data
+    cursor = await conn_transit.execute(
+        f"SELECT _id, name, age, active, email, salary, tags, metadata FROM {table} ORDER BY _id"
+    )
+    rows = await cursor.fetchall()
+
+    assert len(rows) == 3
+
+    # Verify first record (alice)
+    alice_row = rows[0]
+    assert alice_row[0] == "alice"
+    assert alice_row[1] == "Alice Smith"
+    assert alice_row[2] == 30
+    assert alice_row[3] is True
+    assert alice_row[4] == "alice@example.com"
+    assert alice_row[5] == 125000.5
+
+    # Verify nested array (tags) - With transit output format, properly typed
+    tags_from_db = alice_row[6]
+    assert isinstance(tags_from_db, list), f"tags should be list, got {type(tags_from_db)}"
+    assert tags_from_db == ["admin", "developer"], f"tags mismatch"
+
+    # Verify nested object (metadata) - With transit output format, decode transit string
+    metadata_from_db_raw = alice_row[7]
+    metadata_from_db = TransitDecoder.decode(metadata_from_db_raw)
+    assert isinstance(metadata_from_db, dict), f"metadata should be dict after decoding"
+    assert metadata_from_db.get('department') == 'Engineering'
+    assert metadata_from_db.get('level') == 5
+
+    print(f"\n✅ Successfully tested transit-msgpack with COPY FROM!")
+    print(f"   All {len(rows)} records loaded and verified from msgpack binary format")
+
+@pytest.mark.asyncio
 async def test_transit_nest_one_full_record(conn_transit, clean_table_transit):
     """
     Test NEST_ONE() with transit fallback to decode an entire record as a nested object.

@@ -151,13 +151,13 @@
         ;; Parse and insert each line
         (doseq [line lines]
           (let [user-data (json/parse-string line true)
-                ;; Transit format: ["^ " "~:_id" "alice" "~:name" "Alice Smith" ...]
+                ;; Transit format with string keys: ["^ " "_id" "alice" "name" "Alice Smith" ...]
                 pairs (rest user-data) ;; Skip "^ "
                 map-data (apply hash-map pairs)
-                id (get map-data "~:_id")
-                name (get map-data "~:name")
-                age (get map-data "~:age")
-                active (get map-data "~:active")]
+                id (get map-data "_id")
+                name (get map-data "name")
+                age (get map-data "age")
+                active (get map-data "active")]
 
             ;; Insert using RECORDS syntax
             (pg/execute! conn [(format "INSERT INTO %s RECORDS {_id: '%s', name: '%s', age: %d, active: %s}"

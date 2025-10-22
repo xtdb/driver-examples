@@ -213,6 +213,40 @@ RSpec.describe "Transit-JSON Operations" do
     expect(rows.length).to eq(1)
   end
 
+  it "parses sample-users-transit.msgpack file" do
+    # Load transit-msgpack file (binary)
+    msgpack_path = File.join(File.dirname(__FILE__), '../../test-data/sample-users-transit.msgpack')
+    msgpack_data = File.binread(msgpack_path)
+
+    # Get raw pg connection from Sequel
+    conn = db.synchronize { |c| c }
+
+    # Use COPY FROM STDIN with transit-msgpack format (without explicit transaction)
+    conn.exec("COPY #{table} FROM STDIN WITH (FORMAT 'transit-msgpack')")
+    conn.put_copy_data(msgpack_data)
+    result = conn.put_copy_end
+
+    # Check if copy succeeded
+    if result.is_a?(String) && !result.empty?
+      raise "COPY failed: #{result}"
+    end
+
+    # Get the result to ensure command completed
+    while res = conn.get_result
+      if res.result_status != PG::PGRES_COMMAND_OK
+        raise "COPY failed with status: #{res.result_status}"
+      end
+    end
+
+    # Query back and verify - use Sequel for querying
+    rows = db["SELECT _id, name, age FROM #{table} ORDER BY _id"].all
+
+    expect(rows.length).to eq(3)
+    expect(rows[0][:_id]).to eq('alice')
+    expect(rows[0][:name]).to eq('Alice Smith')
+    expect(rows[0][:age]).to eq(30)
+  end
+
   it "uses NEST_ONE to decode entire record with transit fallback" do
     # Load transit-JSON file
     transit_path = File.join(File.dirname(__FILE__), '../../test-data/sample-users-transit.json')
