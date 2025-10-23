@@ -169,12 +169,55 @@ describe("Transit-JSON with RECORDS", () => {
     assert.strictEqual(result[0].age, 35);
   });
 
+  it.skip("should parse sample-users-transit.json file via COPY FROM", async () => {
+    // Note: COPY FROM STDIN completes successfully on the server side (data is inserted),
+    // but postgres.js writable stream doesn't properly finalize the COPY protocol.
+    // This leaves the connection in a stuck state where subsequent queries hang.
+    //
+    // WORKAROUND: Close and reopen the connection after COPY operations.
+    // See COPY-WORKAROUND.md and test-copy-reconnect-workaround.mjs for details.
+    const { readFile } = await import("fs/promises");
+    const { Readable } = await import("stream");
+    const { pipeline } = await import("stream/promises");
+
+    const transitData = await readFile("../test-data/sample-users-transit.json", "utf8");
+
+    // Use COPY FROM STDIN with transit-json format
+    const stream = Readable.from([transitData]);
+    const writable = await sql`COPY transit_copy_test FROM STDIN WITH (FORMAT 'transit-json')`.writable();
+    await pipeline(stream, writable);
+
+    // Query back and verify
+    const results = await sql`SELECT _id, name, age, active, email, salary, tags, metadata FROM transit_copy_test ORDER BY _id`;
+
+    assert.strictEqual(results.length, 3);
+
+    // Verify first record (alice) with all fields
+    const alice = results[0];
+    assert.strictEqual(alice._id, "alice");
+    assert.strictEqual(alice.name, "Alice Smith");
+    assert.strictEqual(alice.age, 30);
+    assert.strictEqual(alice.active, true);
+    assert.strictEqual(alice.email, "alice@example.com");
+    assert.strictEqual(alice.salary, 125000.5);
+
+    // Verify nested array (tags)
+    assert.ok(Array.isArray(alice.tags));
+    assert.ok(alice.tags.includes("admin"));
+    assert.ok(alice.tags.includes("developer"));
+    assert.strictEqual(alice.tags.length, 2);
+
+    // Verify nested object (metadata)
+    assert.strictEqual(typeof alice.metadata, "object");
+    assert.strictEqual(alice.metadata.department, "Engineering");
+    assert.strictEqual(alice.metadata.level, 5);
+    assert.ok(alice.metadata.joined.includes("2020-01-15"));
+  });
+
   it.skip("should parse sample-users-transit.msgpack file via COPY FROM", async () => {
     // Note: The postgres library's COPY FROM STDIN implementation has issues with
-    // binary msgpack streams - the COPY completes but returns 0 rows.
     // Transit-msgpack support is verified in other languages (Python, Go, Ruby, Java, Kotlin, C).
     // See ../test-data/sample-users-transit.msgpack for the msgpack test data.
-    // Transit-JSON works perfectly in Node.js (see other tests in this suite).
   });
 
   it("should use NEST_ONE to decode entire record with transit fallback", async () => {
@@ -267,5 +310,12 @@ describe("Transit-JSON with RECORDS", () => {
 
     console.log(`\n✅ NEST_ONE with transit fallback successfully decoded entire record!`);
     console.log(`   All fields accessible as native JavaScript types`);
+  });
+
+  it("zzz feature report", () => {
+    // Report unsupported features for matrix generation. Runs last due to zzz prefix.
+    // postgres.js writable stream doesn't properly finalize COPY protocol - connection hangs after pipeline completes
+    console.log("XTDB_FEATURE_UNSUPPORTED: language=nodejs feature=transit-json-copy reason=postgres-library-copy-connection-hangs-after-completion");
+    console.log("XTDB_FEATURE_UNSUPPORTED: language=nodejs feature=transit-msgpack-copy reason=postgres-library-copy-connection-hangs-after-completion");
   });
 });

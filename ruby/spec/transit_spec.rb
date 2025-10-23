@@ -247,6 +247,65 @@ RSpec.describe "Transit-JSON Operations" do
     expect(rows[0][:age]).to eq(30)
   end
 
+  it "parses sample-users-transit.json file via COPY FROM" do
+    # Load transit-JSON file
+    json_path = File.join(File.dirname(__FILE__), '../../test-data/sample-users-transit.json')
+    json_data = File.read(json_path)
+
+    # Get raw pg connection from Sequel
+    conn = db.synchronize { |c| c }
+
+    # Use COPY FROM STDIN with transit-json format
+    conn.exec("COPY #{table} FROM STDIN WITH (FORMAT 'transit-json')")
+    conn.put_copy_data(json_data)
+    result = conn.put_copy_end
+
+    # Check if copy succeeded
+    if result.is_a?(String) && !result.empty?
+      raise "COPY failed: #{result}"
+    end
+
+    # Get the result to ensure command completed
+    while res = conn.get_result
+      if res.result_status != PG::PGRES_COMMAND_OK
+        raise "COPY failed with status: #{res.result_status}"
+      end
+    end
+
+    # Query back and verify - use Sequel for querying
+    rows = db["SELECT _id, name, age, active, email, salary, tags, metadata FROM #{table} ORDER BY _id"].all
+
+    # Verify 3 records are loaded
+    expect(rows.length).to eq(3)
+
+    # Verify the alice record has correct fields
+    alice = rows[0]
+    expect(alice[:_id]).to eq('alice')
+    expect(alice[:name]).to eq('Alice Smith')
+    expect(alice[:age]).to eq(30)
+    expect(alice[:active]).to be true
+    expect(alice[:email]).to eq('alice@example.com')
+    expect(alice[:salary]).to be_within(0.01).of(125000.5)
+
+    # Verify nested array (tags)
+    tags = TransitDecoder.decode(alice[:tags])
+    expect(tags).to be_a(Array)
+    expect(tags).to include('admin')
+    expect(tags).to include('developer')
+    expect(tags.length).to eq(2)
+
+    # Verify nested object (metadata)
+    metadata = TransitDecoder.decode(alice[:metadata])
+    expect(metadata).to be_a(Hash)
+    expect(metadata['department']).to eq('Engineering')
+    expect(metadata['level']).to eq(5)
+    expect(metadata['joined']).to match(/2020-01-15/)  # Accept both date-only and datetime formats
+
+    # Print success message
+    puts "\n✅ Successfully loaded 3 records via COPY FROM with FORMAT 'transit-json'"
+    puts "   Alice record verified with all fields including nested structures"
+  end
+
   it "uses NEST_ONE to decode entire record with transit fallback" do
     # Load transit-JSON file
     transit_path = File.join(File.dirname(__FILE__), '../../test-data/sample-users-transit.json')
@@ -333,5 +392,10 @@ RSpec.describe "Transit-JSON Operations" do
 
     puts "\n✅ NEST_ONE with transit fallback successfully decoded entire record!"
     puts "   All fields accessible as native Ruby types"
+  end
+
+  it "zzz feature report" do
+    # Report unsupported features for matrix generation. Runs last due to zzz prefix.
+    # Ruby supports all features - nothing to report
   end
 end

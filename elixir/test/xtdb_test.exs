@@ -562,7 +562,8 @@ defmodule XTDBTest do
   end
 
   test "parse transit msgpack via SQL" do
-    # Note: Elixir Postgrex doesn't have easy COPY FROM API, so we skip this test
+    # Note: Postgrex has a COPY FROM API, but there's an open issue with COPY functionality
+    # See https://github.com/xtdb/xtdb/issues/4833 for details
     # Transit-msgpack support is verified in other languages (Python, Go, Java, Kotlin, Ruby, PHP, C)
     # See ../test-data/sample-users-transit.msgpack for the msgpack test data
     assert true
@@ -581,5 +582,13 @@ defmodule XTDBTest do
     # Verify date formatting
     assert String.contains?(transit_json, "~t2024-01-15")
     assert String.contains?(transit_json, "~t2024-01-15T10:30:45")
+  end
+
+  test "zzz feature report" do
+    # Report unsupported features for matrix generation. Runs last due to zzz prefix.
+    # Postgrex has a COPY FROM API, but there's an open issue with COPY functionality
+    # See https://github.com/xtdb/xtdb/issues/4833 for details
+    IO.puts("XTDB_FEATURE_UNSUPPORTED: language=elixir feature=transit-json-copy reason=postgrex-copy-api-issue-4833")
+    IO.puts("XTDB_FEATURE_UNSUPPORTED: language=elixir feature=transit-msgpack-copy reason=postgrex-copy-api-issue-4833")
   end
 end

@@ -34,6 +34,48 @@ Within the `driver-examples` directory you will find a range of subdirectories f
 
 Feel free to hack on the examples - your Codespace is your own to explore!
 
+## Language Feature Compatibility Matrix
+
+The following matrix shows features that are not supported in some languages:
+
+| Language | Transit-JSON (COPY) | Transit-Msgpack (COPY) | Transit-JSON (Parameters) |
+|----------|---------------------|------------------------|---------------------------|
+| **Python** | ✅ | ✅ | ✅ |
+| **Node.js** | ❌ | ❌ | ✅ |
+| **Go** | ✅ | ✅ | ✅ |
+| **Ruby** | ✅ | ✅ | ✅ |
+| **Java** | ✅ | ✅ | ✅ |
+| **Kotlin** | ✅ | ✅ | ✅ |
+| **C** | ✅ | ✅ | ✅ |
+| **C#** | ❌ | ❌ | ❌ |
+| **Clojure** | ✅ | ✅ | ✅ |
+| **Elixir** | ❌ | ❌ | ✅ |
+| **Babashka** | ❌ | ❌ | ❌ |
+| **PHP** | ❌ | ❌ | ✅ |
+
+### Updating the Matrix
+
+The compatibility matrix is automatically generated from test output. To regenerate it:
+
+```bash
+python3 scripts/generate-feature-matrix.py
+```
+
+Languages report only **unsupported** features. All features are assumed supported by default, minimizing maintenance burden.
+
+### Testing
+
+Run all language tests:
+```bash
+mise run test:all
+```
+
+Run tests for a specific language:
+```bash
+cd <language-directory>
+mise run test
+```
+
 ## Help
 
 Debug logs for the XTDB container can be found under `logs/xtdb.log`.

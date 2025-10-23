@@ -629,6 +629,158 @@ func TestTransitMsgpackCopyFrom(t *testing.T) {
 	t.Logf("✅ Successfully tested transit-msgpack with COPY FROM! Loaded %d records from msgpack binary format", count)
 }
 
+func TestTransitJsonCopyFrom(t *testing.T) {
+	conn := getConnTransit(t)
+	defer conn.Close(context.Background())
+
+	table := getCleanTable()
+
+	// Read the transit-json file
+	jsonData, err := os.ReadFile("../test-data/sample-users-transit.json")
+	if err != nil {
+		t.Fatalf("Failed to read transit-json file: %v", err)
+	}
+
+	// Use COPY FROM STDIN with transit-json format
+	_, err = conn.PgConn().CopyFrom(
+		context.Background(),
+		strings.NewReader(string(jsonData)),
+		fmt.Sprintf("COPY %s FROM STDIN WITH (FORMAT 'transit-json')", table),
+	)
+	if err != nil {
+		t.Fatalf("COPY FROM failed: %v", err)
+	}
+
+	// Query back and verify - get ALL columns
+	rows, err := conn.Query(context.Background(),
+		fmt.Sprintf("SELECT * FROM %s ORDER BY _id", table))
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	defer rows.Close()
+
+	// Get column names
+	fieldDescs := rows.FieldDescriptions()
+	columnNames := make([]string, len(fieldDescs))
+	for i, fd := range fieldDescs {
+		columnNames[i] = string(fd.Name)
+	}
+
+	count := 0
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			t.Fatalf("Failed to get values: %v", err)
+		}
+
+		// Create a map of column name -> value
+		rowMap := make(map[string]interface{})
+		for i, colName := range columnNames {
+			rowMap[colName] = values[i]
+		}
+
+		count++
+
+		// Verify first record (alice) - check all important fields
+		if count == 1 {
+			if rowMap["_id"] != "alice" {
+				t.Errorf("Expected _id='alice', got %v", rowMap["_id"])
+			}
+			if rowMap["name"] != "Alice Smith" {
+				t.Errorf("Expected name='Alice Smith', got %v", rowMap["name"])
+			}
+
+			// Age might be int32, int64, or float64 depending on how pgx decodes it
+			ageVal := rowMap["age"]
+			var age int64
+			switch v := ageVal.(type) {
+			case int32:
+				age = int64(v)
+			case int64:
+				age = v
+			case float64:
+				age = int64(v)
+			default:
+				t.Errorf("Expected age to be numeric, got %T: %v", ageVal, ageVal)
+			}
+			if age != 30 {
+				t.Errorf("Expected age=30, got %d", age)
+			}
+
+			if active, ok := rowMap["active"].(bool); !ok || !active {
+				t.Errorf("Expected active=true, got %v", rowMap["active"])
+			}
+
+			if rowMap["email"] != "alice@example.com" {
+				t.Errorf("Expected email='alice@example.com', got %v", rowMap["email"])
+			}
+
+			// Verify salary (float field) - May be transit-encoded, decode if needed
+			salaryDecoded := DecodeTransitValueTransit(rowMap["salary"])
+			if salary, ok := salaryDecoded.(float64); !ok || salary != 125000.5 {
+				t.Errorf("Expected salary=125000.5 (float64), got %v (type %T)", salaryDecoded, salaryDecoded)
+			}
+
+			// Verify nested array (tags)
+			if tags, ok := rowMap["tags"].([]interface{}); ok {
+				t.Logf("✅ Tags properly typed as []interface{}: %v", tags)
+				if len(tags) != 2 {
+					t.Errorf("Expected 2 tags, got %d", len(tags))
+				} else {
+					if tags[0] != "admin" || tags[1] != "developer" {
+						t.Errorf("Expected tags ['admin', 'developer'], got %v", tags)
+					}
+				}
+			} else {
+				t.Errorf("Expected tags to be []interface{}, got %T: %v", rowMap["tags"], rowMap["tags"])
+			}
+
+			// Verify nested object (metadata) - May be transit-encoded, decode if needed
+			metadataDecoded := DecodeTransitValueTransit(rowMap["metadata"])
+			if metadata, ok := metadataDecoded.(map[string]interface{}); ok {
+				t.Logf("✅ Metadata properly typed as map[string]interface{}: %v", metadata)
+
+				// Validate metadata fields
+				if dept, ok := metadata["department"].(string); !ok || dept != "Engineering" {
+					t.Errorf("Expected department='Engineering', got %v (type %T)", metadata["department"], metadata["department"])
+				}
+
+				// Level might be float64 or int from JSON parsing
+				var level int64
+				switch v := metadata["level"].(type) {
+				case float64:
+					level = int64(v)
+				case int64:
+					level = v
+				case int32:
+					level = int64(v)
+				default:
+					t.Errorf("Expected level to be numeric, got %T: %v", metadata["level"], metadata["level"])
+				}
+				if level != 5 {
+					t.Errorf("Expected level=5, got %d", level)
+				}
+
+				// Joined date - should be present
+				if metadata["joined"] == nil {
+					t.Error("Expected joined field in metadata")
+				} else {
+					t.Logf("Joined date: %v (type: %T)", metadata["joined"], metadata["joined"])
+				}
+			} else {
+				t.Errorf("Expected metadata to be map[string]interface{}, got %T: %v", rowMap["metadata"], rowMap["metadata"])
+			}
+		}
+	}
+
+	if count != 3 {
+		t.Errorf("Expected 3 records, got %d", count)
+	}
+
+	fmt.Println("✅ Successfully tested transit-json with COPY FROM! Loaded 3 records from JSON format")
+	t.Logf("✅ Successfully tested transit-json with COPY FROM! Loaded %d records from JSON format", count)
+}
+
 func TestTransitNestOneFullRecord(t *testing.T) {
 	conn := getConnTransit(t)
 	defer conn.Close(context.Background())
@@ -785,4 +937,9 @@ func TestTransitNestOneFullRecord(t *testing.T) {
 
 	t.Logf("\n✅ NEST_ONE with transit fallback successfully decoded entire record!")
 	t.Logf("   All fields accessible as native Go types")
+}
+
+func TestZzzFeatureReport(t *testing.T) {
+	// Report unsupported features for matrix generation. Runs last due to Zzz prefix.
+	// Go supports all features - nothing to report
 }

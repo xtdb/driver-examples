@@ -448,6 +448,56 @@ async def test_transit_msgpack_parsing(conn_transit, clean_table_transit):
     print(f"   All {len(rows)} records loaded and verified from msgpack binary format")
 
 @pytest.mark.asyncio
+async def test_transit_json_copy_parsing(conn_transit, clean_table_transit):
+    """Test parsing sample-users-transit.json file using COPY FROM with transit-json format."""
+    import os
+
+    table = clean_table_transit
+    test_data_path = os.path.join(os.path.dirname(__file__), "../../test-data/sample-users-transit.json")
+
+    # Read the JSON file as text data (newline-delimited JSON)
+    with open(test_data_path, 'r') as f:
+        json_data = f.read()
+
+    # Use COPY FROM STDIN with transit-json format
+    async with conn_transit.cursor() as cur:
+        # Start a COPY operation with transit-json format
+        async with cur.copy(f"COPY {table} FROM STDIN WITH (FORMAT 'transit-json')") as copy:
+            await copy.write(json_data.encode('utf-8'))
+
+    # Query back and verify - get ALL columns including nested data
+    cursor = await conn_transit.execute(
+        f"SELECT _id, name, age, active, email, salary, tags, metadata FROM {table} ORDER BY _id"
+    )
+    rows = await cursor.fetchall()
+
+    assert len(rows) == 3
+
+    # Verify first record (alice)
+    alice_row = rows[0]
+    assert alice_row[0] == "alice"
+    assert alice_row[1] == "Alice Smith"
+    assert alice_row[2] == 30
+    assert alice_row[3] is True
+    assert alice_row[4] == "alice@example.com"
+    assert alice_row[5] == 125000.5
+
+    # Verify nested array (tags) - With transit output format, properly typed
+    tags_from_db = alice_row[6]
+    assert isinstance(tags_from_db, list), f"tags should be list, got {type(tags_from_db)}"
+    assert tags_from_db == ["admin", "developer"], f"tags mismatch"
+
+    # Verify nested object (metadata) - With transit output format, decode transit string
+    metadata_from_db_raw = alice_row[7]
+    metadata_from_db = TransitDecoder.decode(metadata_from_db_raw)
+    assert isinstance(metadata_from_db, dict), f"metadata should be dict after decoding"
+    assert metadata_from_db.get('department') == 'Engineering'
+    assert metadata_from_db.get('level') == 5
+
+    print(f"\n✅ Successfully tested transit-json with COPY FROM!")
+    print(f"   All {len(rows)} records loaded and verified from JSON format")
+
+@pytest.mark.asyncio
 async def test_transit_nest_one_full_record(conn_transit, clean_table_transit):
     """
     Test NEST_ONE() with transit fallback to decode an entire record as a nested object.
@@ -543,3 +593,10 @@ async def test_transit_nest_one_full_record(conn_transit, clean_table_transit):
 
     print(f"\n✅ NEST_ONE with transit fallback successfully decoded entire record!")
     print(f"   All fields accessible as native Python types")
+
+
+@pytest.mark.asyncio
+async def test_zzz_feature_report():
+    """Report unsupported features for matrix generation. Runs last due to zzz prefix."""
+    # Python supports all features - nothing to report
+    pass

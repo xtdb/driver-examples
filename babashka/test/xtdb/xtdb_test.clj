@@ -186,3 +186,10 @@
 
     ;; Verify it can be parsed as JSON
     (is (some? (json/parse-string transit-json)))))
+
+(deftest test-zzz-feature-report
+  ;; Report unsupported features for matrix generation. Runs last due to zzz prefix.
+  ;; Babashka's pod.babashka.postgresql doesn't support COPY FROM STDIN or explicit OID specification for parameters
+  (println "XTDB_FEATURE_UNSUPPORTED: language=babashka feature=transit-json-copy reason=pod-no-copy-from-stdin-support")
+  (println "XTDB_FEATURE_UNSUPPORTED: language=babashka feature=transit-msgpack-copy reason=pod-no-copy-from-stdin-support")
+  (println "XTDB_FEATURE_UNSUPPORTED: language=babashka feature=transit-json-parameters reason=pod-no-explicit-oid-support"))

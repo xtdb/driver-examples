@@ -454,5 +454,15 @@ namespace XtdbTests
                 Console.WriteLine("   All fields accessible as native C# types via JsonElement");
             }
         }
+
+        [Fact]
+        public void TestZzzFeatureReport()
+        {
+            // Report unsupported features for matrix generation. Runs last due to Zzz prefix.
+            // C# Npgsql cannot access transit OID 16384 for COPY operations or parameterized queries (blocked by issue #4421)
+            Console.WriteLine("XTDB_FEATURE_UNSUPPORTED: language=csharp feature=transit-json-copy reason=npgsql-cannot-access-transit-oid");
+            Console.WriteLine("XTDB_FEATURE_UNSUPPORTED: language=csharp feature=transit-msgpack-copy reason=npgsql-cannot-access-transit-oid");
+            Console.WriteLine("XTDB_FEATURE_UNSUPPORTED: language=csharp feature=transit-json-parameters reason=npgsql-cannot-access-transit-oid");
+        }
     }
 }

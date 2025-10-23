@@ -721,6 +721,73 @@ TEST(transit_msgpack_copy_from) {
     PASS();
 }
 
+TEST(transit_json_copy_from) {
+    char *table = get_clean_table();
+    char query[512];
+
+    /* Read transit-json file as text */
+    FILE *fp = fopen("../test-data/sample-users-transit.json", "r");
+    ASSERT(fp != NULL, "Failed to open transit-json file");
+
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    char *json_data = malloc(file_size + 1);
+    size_t bytes_read = fread(json_data, 1, file_size, fp);
+    fclose(fp);
+    json_data[bytes_read] = '\0';
+    ASSERT(bytes_read == file_size, "Failed to read transit-json file");
+
+    /* Use COPY FROM STDIN with transit-json format */
+    snprintf(query, sizeof(query),
+             "COPY %s FROM STDIN WITH (FORMAT 'transit-json')", table);
+
+    PGresult *res = PQexec(conn, query);
+    ASSERT(PQresultStatus(res) == PGRES_COPY_IN, "COPY command failed");
+    PQclear(res);
+
+    /* Send the JSON data */
+    int result = PQputCopyData(conn, json_data, bytes_read);
+    ASSERT(result == 1, "PQputCopyData failed");
+
+    result = PQputCopyEnd(conn, NULL);
+    ASSERT(result == 1, "PQputCopyEnd failed");
+
+    /* Get the result */
+    res = PQgetResult(conn);
+    ASSERT(PQresultStatus(res) == PGRES_COMMAND_OK, "COPY completion failed");
+    PQclear(res);
+
+    free(json_data);
+
+    /* Verify 3 records were loaded */
+    snprintf(query, sizeof(query), "SELECT COUNT(*) FROM %s", table);
+    res = PQexec(conn, query);
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Count query failed");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 0), "3", "Expected 3 records");
+    PQclear(res);
+
+    /* Verify the alice record has correct fields */
+    snprintf(query, sizeof(query),
+             "SELECT _id, name, age, email, active, salary FROM %s WHERE _id = 'alice'", table);
+    res = PQexec(conn, query);
+
+    ASSERT(PQresultStatus(res) == PGRES_TUPLES_OK, "Select failed");
+    ASSERT(PQntuples(res) == 1, "Expected 1 record for alice");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 0), "alice", "_id should be alice");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 1), "Alice Smith", "Name should be Alice Smith");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 2), "30", "Age should be 30");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 3), "alice@example.com", "Email should be alice@example.com");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 4), "t", "Active should be true");
+    ASSERT_EQ_STR(PQgetvalue(res, 0, 5), "125000.5", "Salary should be 125000.5");
+
+    PQclear(res);
+
+    printf("  Successfully tested transit-json with COPY FROM! Loaded 3 records from JSON format\n");
+    PASS();
+}
+
 int main(void) {
     srand(time(NULL));
 
@@ -751,6 +818,10 @@ int main(void) {
     RUN_TEST(transit_json_format);
     RUN_TEST(transit_json_encoding);
     RUN_TEST(transit_msgpack_copy_from);
+    RUN_TEST(transit_json_copy_from);
+
+    // Feature report for matrix generation
+    // C supports all features - nothing to report
 
     PQfinish(conn);
 

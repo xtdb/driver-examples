@@ -144,6 +144,20 @@ class TransitTest extends TestCase
         $this->markTestSkipped('ext-pq COPY FROM STDIN with binary msgpack data causes segfaults - this is a known limitation of ext-pq');
     }
 
+    public function testTransitJsonCopyFrom(): void
+    {
+        // Note: ext-pq's pq\COPY class causes segmentation faults with COPY FROM STDIN operations.
+        // The correct ext-pq API would be:
+        //   $copy = new pq\COPY($conn, $table, pq\COPY::FROM_STDIN, "FORMAT 'transit-json'");
+        //   $copy->put($data);
+        //   $copy->end();
+        // However, this causes segfaults even with simple CSV data, not just transit formats.
+        // This is a known limitation of ext-pq with XTDB's COPY FROM STDIN implementation.
+        // Transit-json support via COPY FROM is verified in other languages.
+        // See ../test-data/sample-users-transit.json for the transit-json test data.
+        $this->markTestSkipped('ext-pq COPY class causes segfaults with COPY FROM STDIN - this is a known limitation of ext-pq');
+    }
+
     public function testNestOneWithTransit(): void
     {
         $table = $this->getCleanTable();
@@ -210,5 +224,13 @@ class TransitTest extends TestCase
         echo "   ✅ Nested object (metadata) properly typed\n";
         echo "\n✅ NEST_ONE with transit fallback successfully decoded entire record!\n";
         echo "   All fields accessible as native PHP types\n";
+    }
+
+    public function testZzzFeatureReport(): void
+    {
+        // Report unsupported features for matrix generation. Runs last due to Zzz prefix.
+        // PHP ext-pq's COPY class causes segfaults with COPY FROM STDIN for both transit formats
+        echo "XTDB_FEATURE_UNSUPPORTED: language=php feature=transit-json-copy reason=ext-pq-copy-from-stdin-segfaults\n";
+        echo "XTDB_FEATURE_UNSUPPORTED: language=php feature=transit-msgpack-copy reason=ext-pq-copy-from-stdin-segfaults\n";
     }
 }

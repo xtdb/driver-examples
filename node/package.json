@@ -9,5 +9,8 @@
   "dependencies": {
     "postgres": "^3.4.5",
     "transit-js": "^0.8.874"
+  },
+  "devDependencies": {
+    "testcontainers": "^11.7.2"
   }
 }

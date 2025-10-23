@@ -304,6 +304,49 @@ public class XtdbTest {
     }
 
     @Test
+    void testTransitJsonCopyFrom() throws Exception {
+        String table = getCleanTable();
+
+        // Load transit-json file as text
+        String transitJsonPath = "../test-data/sample-users-transit.json";
+        String transitJsonData = Files.readString(Paths.get(transitJsonPath));
+
+        // Use COPY FROM STDIN with transit-json format
+        org.postgresql.PGConnection pgConn = connection.unwrap(org.postgresql.PGConnection.class);
+        org.postgresql.copy.CopyManager copyManager = pgConn.getCopyAPI();
+
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(transitJsonData.getBytes())) {
+            copyManager.copyIn(
+                String.format("COPY %s FROM STDIN WITH (FORMAT 'transit-json')", table),
+                bis
+            );
+        }
+
+        // Query back and verify
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                String.format("SELECT _id, name, age, active, email FROM %s ORDER BY _id", table))) {
+
+            // Verify first record (alice)
+            assertTrue(rs.next());
+            assertEquals("alice", rs.getString("_id"));
+            assertEquals("Alice Smith", rs.getString("name"));
+            assertEquals(30, rs.getInt("age"));
+            assertTrue(rs.getBoolean("active"));
+            assertEquals("alice@example.com", rs.getString("email"));
+
+            // Count all records
+            int count = 1;
+            while (rs.next()) {
+                count++;
+            }
+            assertEquals(3, count);
+
+            System.out.println("✅ Transit JSON COPY FROM test passed - 3 records loaded, alice record verified");
+        }
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void testParseTransitJSON() throws Exception {
         String table = getCleanTable();
@@ -398,5 +441,62 @@ public class XtdbTest {
         assertEquals("hello", parsed.get(TransitFactory.keyword("string")));
         assertEquals(42L, parsed.get(TransitFactory.keyword("number")));
         assertTrue((Boolean) parsed.get(TransitFactory.keyword("bool")));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testNestOneFullRecord() throws Exception {
+        String table = getCleanTable();
+
+        // Load sample-users-transit.json
+        String transitPath = "../test-data/sample-users-transit.json";
+        List<String> lines = Files.readAllLines(Paths.get(transitPath));
+
+        // Insert using transit OID (16384) with single parameter per record
+        try (PreparedStatement pstmt = connection.prepareStatement(
+            String.format("INSERT INTO %s RECORDS ?", table))) {
+
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+
+                PGobject transitObject = new PGobject();
+                transitObject.setType("transit");
+                transitObject.setValue(line);
+
+                pstmt.setObject(1, transitObject);
+                pstmt.execute();
+            }
+        }
+
+        // Query using NEST_ONE to get entire record as a single nested object
+        try (PreparedStatement pstmt = connection.prepareStatement(
+            String.format("SELECT NEST_ONE(FROM %s WHERE _id = ?) AS r", table))) {
+
+            pstmt.setString(1, "alice");
+            try (ResultSet rs = pstmt.executeQuery()) {
+                assertTrue(rs.next());
+
+                // The entire record comes back as a nested object (PGobject with transit type)
+                Object record = rs.getObject("r");
+                assertNotNull(record);
+                System.out.println("\n✅ NEST_ONE returned entire record: " + record.getClass().getSimpleName());
+
+                // NEST_ONE returns the record, but JDBC doesn't automatically parse it
+                // In production, you would parse the transit-encoded result
+                // For now, verify it's not null and is a valid object
+                String recordStr = record.toString();
+                assertTrue(recordStr.contains("alice") || recordStr.contains("Alice"));
+                System.out.println("   Record contains expected data: " + recordStr.substring(0, Math.min(100, recordStr.length())) + "...");
+
+                System.out.println("\n✅ NEST_ONE successfully retrieved entire record!");
+                System.out.println("   Note: JDBC returns the raw result; production code should parse with transit-java");
+            }
+        }
+    }
+
+    @Test
+    void testZzzFeatureReport() {
+        // Report unsupported features for matrix generation. Runs last due to Zzz prefix.
     }
 }
