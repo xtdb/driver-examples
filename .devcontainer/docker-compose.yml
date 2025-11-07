@@ -32,12 +32,18 @@ services:
       - xtdb
 
   xtdb:
-    image: ghcr.io/xtdb/xtdb:edge
+    image: ghcr.io/xtdb/xtdb-aws:edge
     container_name: xtdb
     restart: unless-stopped
     user: "20000:20000"
     environment:
-      JDK_JAVA_OPTIONS: "-Dlogback.configurationFile=/config/logback.xml"
+      JDK_JAVA_OPTIONS: "-Xmx1000m -Xms1000m -XX:MaxDirectMemorySize=2000m -XX:MaxMetaspaceSize=256m -Dlogback.configurationFile=/config/logback.xml"
+      KAFKA_BOOTSTRAP_SERVERS: ""
+      XTDB_LOG_TOPIC: ""
+      XTDB_S3_BUCKET: ""
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN}"
     volumes:
       - xtdb-data:/var/lib/xtdb
       - ./xtdb.yaml:/config/xtdb.yaml
@@ -47,6 +53,8 @@ services:
       - init-volumes
     ports:
       - "5432:5432"  # Expose XTDB on the host
+    mem_limit: 5000m
+    memswap_limit: 5000m
 
 volumes:
   xtdb-data:

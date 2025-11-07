@@ -1,12 +1,15 @@
 log: !Local
-  path: "/var/lib/xtdb/data/log"
+  path: /var/lib/xtdb/data/log1
 
 storage: !Local
-  path: "/var/lib/xtdb/data/buffers"
+  path: /var/lib/xtdb/data/storage1
 
 healthz:
   port: 8080
 
+diskCache:
+  path: /var/lib/xtdb/remote-cache
+
 server:
   port: 5432
-  host: "0.0.0.0"
+  host: '*'
