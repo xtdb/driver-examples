@@ -1,11 +1,23 @@
-log: !Local
-  path: /var/lib/xtdb/data/log1
+logClusters:
+  kafkaCluster: !Kafka
+    bootstrapServers: "redpanda:9092"
 
-storage: !Local
-  path: /var/lib/xtdb/data/storage1
+log: !Kafka
+  cluster: kafkaCluster
+  topic: "log1"
+  autoCreateTopic: true
+
+storage: !Remote
+  objectStore: !S3
+    bucket: xtdb-storage
+    prefix: storage1
+    endpoint: "http://garage:3902"
+    pathStyleAccessEnabled: true
+    region: "garage"
 
 healthz:
   port: 8080
+  host: '*'
 
 diskCache:
   path: /var/lib/xtdb/remote-cache

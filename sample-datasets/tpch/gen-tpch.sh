@@ -65,7 +65,7 @@ if [ -n "$TABLES_ARG" ]; then
  :mvn/repos {"central" {:url "https://repo1.maven.org/maven2/"}
              "clojars" {:url "https://clojars.org/repo"}
              "sonatype-snapshots" {:url "https://central.sonatype.com/repository/maven-snapshots/"}}
- :aliases {:gen {:jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"]}}}' \
+ :aliases {:gen {:jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED" "-Dlogback.configurationFile=/dev/null"]}}}' \
 -M:gen -e "(require '[next.jdbc :as jdbc] '[xtdb.datasets.tpch :as tpch])
     (let [url (str \"jdbc:postgresql://$HOST:$PORT/$DATABASE\")]
       (with-open [conn (jdbc/get-connection url)]
@@ -85,7 +85,7 @@ else
  :mvn/repos {"central" {:url "https://repo1.maven.org/maven2/"}
              "clojars" {:url "https://clojars.org/repo"}
              "sonatype-snapshots" {:url "https://central.sonatype.com/repository/maven-snapshots/"}}
- :aliases {:gen {:jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"]}}}' \
+ :aliases {:gen {:jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED" "-Dlogback.configurationFile=/dev/null"]}}}' \
 -M:gen -e "(require '[next.jdbc :as jdbc] '[xtdb.datasets.tpch :as tpch])
     (let [url (str \"jdbc:postgresql://$HOST:$PORT/$DATABASE\")]
       (with-open [conn (jdbc/get-connection url)]

@@ -28,8 +28,72 @@ services:
     command: sh -c "sudo mkdir -p /workspaces/driver-examples/logs && sudo ln -sfn /var/lib/xtdb/logs/xtdb.log /workspaces/driver-examples/logs/xtdb.log && sleep infinity"
 
     depends_on:
-      - init-volumes
-      - xtdb
+      init-volumes:
+        condition: service_completed_successfully
+      xtdb:
+        condition: service_started
+      redpanda:
+        condition: service_healthy
+
+  garage:
+    image: dxflrs/garage:v2.1.0
+    container_name: garage
+    restart: unless-stopped
+    volumes:
+      - garage-data:/var/lib/garage/data
+      - garage-meta:/var/lib/garage/meta
+      - ./garage.toml:/etc/garage.toml
+    environment:
+      GARAGE_CONFIG_FILE: /etc/garage.toml
+    ports:
+      - "3900:3900"  # RPC
+      - "3901:3901"  # Admin API
+      - "3902:3902"  # S3 API
+
+  init-garage:
+    image: alpine:latest
+    container_name: init-garage
+    volumes:
+      - ./init-garage-alpine.sh:/init-garage.sh:ro
+      - ./garage.toml:/config/garage.toml:ro
+      - garage-data:/var/lib/garage/data:ro
+      - garage-meta:/var/lib/garage/meta:ro
+    network_mode: "service:garage"
+    depends_on:
+      garage:
+        condition: service_started
+    entrypoint: ["/bin/sh", "/init-garage.sh"]
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v25.2.10
+    container_name: redpanda
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      - --mode dev-container
+      - --smp 1
+      - --default-log-level=info
+    ports:
+      - "19092:19092"  # Kafka API (external)
+      - "18081:18081"  # Schema Registry (external)
+      - "18082:18082"  # Pandaproxy (external)
+      - "9644:9644"    # Admin API
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
   xtdb:
     image: ghcr.io/xtdb/xtdb-aws:edge
@@ -38,23 +102,30 @@ services:
     user: "20000:20000"
     environment:
       JDK_JAVA_OPTIONS: "-Xmx1000m -Xms1000m -XX:MaxDirectMemorySize=2000m -XX:MaxMetaspaceSize=256m -Dlogback.configurationFile=/config/logback.xml"
-      KAFKA_BOOTSTRAP_SERVERS: ""
-      XTDB_LOG_TOPIC: ""
-      XTDB_S3_BUCKET: ""
-      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
-      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
-      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN}"
+      AWS_ACCESS_KEY_ID: "GK31c2f218bd3e1932929759c1"
+      AWS_SECRET_ACCESS_KEY: "b8e1ec4d832d1038fb34242fc0f8e4f1ee8e0ce00fc1be1f12e28550b060c2d5"
+      AWS_REGION: "garage"
+      AWS_ENDPOINT: "http://garage:3902"
     volumes:
       - xtdb-data:/var/lib/xtdb
       - ./xtdb.yaml:/config/xtdb.yaml
       - ./logback.xml:/config/logback.xml
     command: ["-f", "/config/xtdb.yaml"]
     depends_on:
-      - init-volumes
+      init-volumes:
+        condition: service_completed_successfully
+      init-garage:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
     ports:
       - "5432:5432"  # Expose XTDB on the host
+      - "8080:8080"  # Healthz/maintenance API
     mem_limit: 5000m
     memswap_limit: 5000m
 
 volumes:
   xtdb-data:
+  garage-data:
+  garage-meta:
+  redpanda-data:

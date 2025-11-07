@@ -21,10 +21,11 @@
     </root>
 
     <!-- Specific Logger Configuration -->
-    <logger name="xtdb" level="DEBUG" />
+    <logger name="xtdb" level="INFO" />
 
     <!-- Useful for debugging drivers and providing detailed logs when reporting issues -->
-    <!-- logger name="xtdb.pgwire" level="TRACE" /-->
+    <logger name="xtdb.pgwire" level="INFO" />
+    <logger name="xtdb.db-catalog" level="TRACE" />
     <logger name="xtdb.pgwire.types" level="INFO" />
     <logger name="xtdb.catalog.BlockCatalog" level="INFO" />
     <logger name="xtdb.indexer.LogProcessor" level="INFO" />
