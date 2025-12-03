@@ -97,6 +97,10 @@ services:
 
   xtdb:
     image: ghcr.io/xtdb/xtdb-aws:edge
+## helpful config for custom (local) image builds...
+#    image: xtdb-aws-local
+#    pull_policy: never # only when using the local image
+## do `docker build -f docker/aws/Dockerfile -t xtdb-aws-local docker/aws/`
     container_name: xtdb
     restart: unless-stopped
     user: "20000:20000"
