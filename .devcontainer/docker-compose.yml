@@ -140,6 +140,20 @@ services:
       xtdb:
         condition: service_started
 
+  garage-webui:
+    image: khairul169/garage-webui:latest
+    container_name: garage-webui
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: "http://garage:3901"
+      S3_ENDPOINT_URL: "http://garage:3902"
+      API_ADMIN_KEY: "changeme1234"
+    ports:
+      - "3909:3909"
+    depends_on:
+      init-garage:
+        condition: service_completed_successfully
+
 volumes:
   xtdb-data:
   garage-data:
