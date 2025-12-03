@@ -121,6 +121,7 @@ services:
     ports:
       - "5432:5432"  # Expose XTDB on the host
       - "8080:8080"  # Healthz/maintenance API
+      - "9833:9833"  # Flight SQL
     mem_limit: 5000m
     memswap_limit: 5000m
 
