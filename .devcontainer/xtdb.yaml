@@ -26,8 +26,6 @@ server:
   port: 5432
   host: '*'
 
-# TODO requires custom xtdb-aws Docker build - reach out for more info
-# modules:
-#  - !FlightSqlServer
-#    host: '0.0.0.0'
-#    port: 9833
+flightSql:
+  host: '*'
+  port: 9833

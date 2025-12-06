@@ -1,12 +1,11 @@
 """
 XTDB Flight SQL Example
 
-Demonstrates connecting to XTDB via Arrow Flight SQL protocol using ADBC.
+Demonstrates connecting to XTDB via Arrow Flight SQL protocol using ADBC,
+including DML operations (INSERT, UPDATE, DELETE, ERASE).
 
-Note: XTDB's Flight SQL implementation currently supports queries (SELECT).
-DML operations (INSERT/UPDATE/DELETE) and some metadata operations are
-not yet fully implemented. Use the PostgreSQL wire protocol for full
-functionality.
+Note: DML operations require parameterized queries via executemany().
+Literal SQL values in DML statements are not yet supported.
 
 Requirements:
     pip install adbc-driver-flightsql pyarrow pandas
@@ -16,11 +15,10 @@ Usage:
 """
 
 import adbc_driver_flightsql.dbapi as flight_sql
+import time
 
 
 def main():
-    # Connect to XTDB Flight SQL server using ADBC
-    # Use "xtdb" as host when running inside Docker, "localhost" from host machine
     uri = "grpc://localhost:9833"
 
     with flight_sql.connect(uri) as conn:
@@ -45,26 +43,84 @@ def main():
             )
             print(cursor.fetch_arrow_table().to_pandas())
 
-            # Query with more expressions
-            print("\n4. More expressions:")
-            cursor.execute("SELECT 10 * 5 AS product, 'foo' || 'bar' AS concat")
+            # DML: INSERT (using executemany with parameters)
+            # Note: Literal SQL values don't work yet, use parameterized queries instead
+            #cursor.execute(
+            #    "INSERT INTO products (_id, name, price, category) VALUES "
+            #    "(1, 'Widget', 19.99, 'gadgets'), "
+            #    "(2, 'Gizmo', 29.99, 'gadgets'), "
+            #    "(3, 'Thingamajig', 9.99, 'misc')"
+            #)
+            print("\n4. DML - INSERT:")
+            cursor.executemany(
+                "INSERT INTO products (_id, name, price, category) VALUES (?, ?, ?, ?)",
+                [
+                    (1, "Widget", 19.99, "gadgets"),
+                    (2, "Gizmo", 29.99, "gadgets"),
+                    (3, "Thingamajig", 9.99, "misc"),
+                ],
+            )
+            print("   Inserted 3 rows into 'products'")
+
+            time.sleep(0.5)
+
+            print("\n5. Query inserted data:")
+            cursor.execute("SELECT * FROM products ORDER BY _id")
             print(cursor.fetch_arrow_table().to_pandas())
 
-            # If there's existing data, query it
-            print("\n5. Query existing data (if any):")
-            try:
-                cursor.execute("SELECT * FROM foo LIMIT 5")
-                result = cursor.fetch_arrow_table()
-                if result.num_rows > 0:
-                    print(result.to_pandas())
-                else:
-                    print("   (table 'foo' is empty)")
-            except Exception as e:
-                print(f"   (table 'foo' doesn't exist or error: {e})")
+            # DML: UPDATE
+            print("\n6. DML - UPDATE:")
+            cursor.executemany(
+                "UPDATE products SET price = ? WHERE _id = ?",
+                [(24.99, 1)],
+            )
+            print("   Updated price for product _id=1")
 
-            print("\n✓ Flight SQL query examples completed successfully")
-            print("\nNote: For INSERT/UPDATE/DELETE operations, use the PostgreSQL")
-            print("wire protocol (port 5432) instead of Flight SQL.")
+            time.sleep(0.5)
+
+            print("\n7. Query after UPDATE:")
+            cursor.execute("SELECT * FROM products ORDER BY _id")
+            print(cursor.fetch_arrow_table().to_pandas())
+
+            # DML: DELETE (sets valid_to, data still visible in history)
+            print("\n8. DML - DELETE:")
+            cursor.executemany("DELETE FROM products WHERE _id = ?", [(3,)])
+            print("   Deleted product _id=3")
+
+            time.sleep(0.5)
+
+            print("\n9. Query after DELETE:")
+            cursor.execute("SELECT * FROM products ORDER BY _id")
+            print(cursor.fetch_arrow_table().to_pandas())
+
+            # Query historical data using FOR ALL VALID_TIME
+            print("\n10. Query historical data (FOR ALL VALID_TIME):")
+            cursor.execute(
+                "SELECT *, _valid_from, _valid_to FROM products "
+                "FOR ALL VALID_TIME ORDER BY _id, _valid_from"
+            )
+            print(cursor.fetch_arrow_table().to_pandas())
+
+            # DML: ERASE (completely removes from history)
+            print("\n11. DML - ERASE:")
+            cursor.executemany("ERASE FROM products WHERE _id = ?", [(2,)])
+            print("   Erased product _id=2 from all history")
+
+            time.sleep(0.5)
+
+            print("\n12. Query after ERASE (FOR ALL VALID_TIME):")
+            cursor.execute(
+                "SELECT *, _valid_from, _valid_to FROM products "
+                "FOR ALL VALID_TIME ORDER BY _id, _valid_from"
+            )
+            print(cursor.fetch_arrow_table().to_pandas())
+
+            # Cleanup
+            print("\n13. Cleanup - ERASE remaining data:")
+            cursor.executemany("ERASE FROM products WHERE _id = ?", [(1,), (3,)])
+            print("   Erased remaining products")
+
+            print("\n✓ Flight SQL DML examples completed successfully")
 
 
 if __name__ == "__main__":
