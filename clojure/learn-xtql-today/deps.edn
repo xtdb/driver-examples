@@ -1,0 +1,26 @@
+{:paths ["src"]
+ :mvn/repos {"sonatype-snapshots" {:url "https://central.sonatype.com/repository/maven-snapshots/"}}
+
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+
+        com.xtdb/xtdb-api {:mvn/version "2.x-SNAPSHOT"}
+        com.xtdb/xtdb-core {:mvn/version "2.x-SNAPSHOT"}
+
+        io.github.nextjournal/clerk {:mvn/version "0.15.957"}
+
+        org.slf4j/slf4j-simple {:mvn/version "2.0.9"}}
+
+ :aliases
+ {:mcp {:extra-deps {com.github.pmonks/clojure-mcp {:git/url "https://github.com/pmonks/clojure-mcp"
+                                                    :git/sha "1eed688"}}
+        :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+                   "-Dio.netty.tryReflectionSetAccessible=true"
+                   "--enable-native-access=ALL-UNNAMED"]
+        :exec-fn clojure-mcp.main/run
+        :exec-args {:port 7884}}
+
+  :dev {:extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
+        :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+                   "-Dio.netty.tryReflectionSetAccessible=true"
+                   "--enable-native-access=ALL-UNNAMED"]
+        :main-opts ["-m" "nrepl.cmdline" "--port" "7884" "--interactive"]}}}
