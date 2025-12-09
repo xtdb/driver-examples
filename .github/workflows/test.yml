@@ -105,6 +105,8 @@ jobs:
           PGPASSWORD: xtdb
 
       - name: Run All Tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           su - runner -c "cd $GITHUB_WORKSPACE && \
             export XTDB_HOST=xtdb && \
