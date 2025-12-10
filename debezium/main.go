@@ -51,10 +51,11 @@ func run() error {
 	fmt.Printf("Loaded %d CDC events from %s\n", len(events), eventsFile)
 
 	// Connect to XTDB
-	connStr := os.Getenv("XTDB_URL")
-	if connStr == "" {
-		connStr = "postgres://xtdb:xtdb@localhost:5432/xtdb"
+	host := os.Getenv("XTDB_HOST")
+	if host == "" {
+		host = "xtdb"
 	}
+	connStr := fmt.Sprintf("postgres://xtdb:xtdb@%s:5432/xtdb", host)
 
 	conn, err := pgx.Connect(ctx, connStr)
 	if err != nil {
