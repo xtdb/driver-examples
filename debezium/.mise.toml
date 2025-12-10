@@ -1,0 +1,49 @@
+[tools]
+go = "1.21"
+
+[tasks.deps]
+description = "Install Go dependencies"
+run = "go mod download && go mod tidy"
+
+[tasks.build]
+description = "Build the ingestion script"
+depends = ["deps"]
+run = "go build -o debezium-ingest ."
+
+[tasks.run]
+description = "Ingest CDC events into XTDB"
+depends = ["deps"]
+run = "go run . cdc/events.json"
+
+[tasks.clean]
+description = "Clean tables in XTDB for re-run"
+run = """
+psql "${XTDB_URL:-postgres://xtdb:xtdb@localhost:5432/xtdb}" -c "
+DELETE FROM users WHERE 1=1;
+DELETE FROM profiles WHERE 1=1;
+DELETE FROM sessions WHERE 1=1;
+" 2>/dev/null || echo "Tables may not exist yet, that's OK"
+"""
+
+[tasks.reset]
+description = "Clean and re-ingest"
+depends = ["clean", "run"]
+
+[tasks.query]
+description = "Run example queries"
+run = "psql \"${XTDB_URL:-postgres://xtdb:xtdb@localhost:5432/xtdb}\" -f sql/queries.sql"
+
+[tasks.test]
+description = "Verify data was ingested correctly"
+run = """
+psql "${XTDB_URL:-postgres://xtdb:xtdb@localhost:5432/xtdb}" -c "
+SELECT 'users' as table_name, COUNT(*) as count FROM users
+UNION ALL
+SELECT 'profiles', COUNT(*) FROM profiles
+UNION ALL
+SELECT 'sessions', COUNT(*) FROM sessions;
+"
+"""
+
+[tasks.default]
+depends = ["run"]

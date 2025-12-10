@@ -1,0 +1,377 @@
+[
+  {
+    "_comment": "Initial users - original schema",
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704067200000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": null,
+      "after": {
+        "id": 1,
+        "email": "alice@example.com",
+        "username": "alice",
+        "created_at": "2024-01-01T00:00:00Z"
+      }
+    }
+  },
+  {
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704067260000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": null,
+      "after": {
+        "id": 2,
+        "email": "bob@example.com",
+        "username": "bob",
+        "created_at": "2024-01-01T00:01:00Z"
+      }
+    }
+  },
+  {
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704067320000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": null,
+      "after": {
+        "id": 3,
+        "email": "charlie@example.com",
+        "username": "charlie",
+        "created_at": "2024-01-01T00:02:00Z"
+      }
+    }
+  },
+  {
+    "_comment": "Initial profiles - original schema",
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704067380000,
+      "source": { "db": "accounts", "table": "profiles" },
+      "before": null,
+      "after": {
+        "id": 1,
+        "user_id": 1,
+        "display_name": "Alice Smith"
+      }
+    }
+  },
+  {
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704067440000,
+      "source": { "db": "accounts", "table": "profiles" },
+      "before": null,
+      "after": {
+        "id": 2,
+        "user_id": 2,
+        "display_name": "Bob Jones"
+      }
+    }
+  },
+  {
+    "_comment": "Initial sessions - original schema",
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704067500000,
+      "source": { "db": "accounts", "table": "sessions" },
+      "before": null,
+      "after": {
+        "id": 1,
+        "user_id": 1,
+        "token": "sess_abc123",
+        "created_at": "2024-01-01T00:05:00Z"
+      }
+    }
+  },
+  {
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704067560000,
+      "source": { "db": "accounts", "table": "sessions" },
+      "before": null,
+      "after": {
+        "id": 2,
+        "user_id": 2,
+        "token": "sess_def456",
+        "created_at": "2024-01-01T00:06:00Z"
+      }
+    }
+  },
+  {
+    "_comment": "SCHEMA EVOLUTION: users table gets phone_number and verified_at columns",
+    "_comment2": "New user with evolved schema",
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704153600000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": null,
+      "after": {
+        "id": 4,
+        "email": "diana@example.com",
+        "username": "diana",
+        "created_at": "2024-01-02T00:00:00Z",
+        "phone_number": "+1-555-0104",
+        "verified_at": "2024-01-02T00:05:00Z"
+      }
+    }
+  },
+  {
+    "_comment": "Update existing user alice with new columns",
+    "payload": {
+      "op": "u",
+      "ts_ms": 1704153660000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": {
+        "id": 1,
+        "email": "alice@example.com",
+        "username": "alice",
+        "created_at": "2024-01-01T00:00:00Z"
+      },
+      "after": {
+        "id": 1,
+        "email": "alice@example.com",
+        "username": "alice",
+        "created_at": "2024-01-01T00:00:00Z",
+        "phone_number": "+1-555-0101",
+        "verified_at": "2024-01-02T00:01:00Z"
+      }
+    }
+  },
+  {
+    "_comment": "SCHEMA EVOLUTION: profiles table gets avatar_url and bio columns",
+    "payload": {
+      "op": "u",
+      "ts_ms": 1704153720000,
+      "source": { "db": "accounts", "table": "profiles" },
+      "before": {
+        "id": 1,
+        "user_id": 1,
+        "display_name": "Alice Smith"
+      },
+      "after": {
+        "id": 1,
+        "user_id": 1,
+        "display_name": "Alice Smith",
+        "avatar_url": "https://avatars.example.com/alice.png",
+        "bio": "Software engineer and coffee enthusiast"
+      }
+    }
+  },
+  {
+    "_comment": "New profile with evolved schema",
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704153780000,
+      "source": { "db": "accounts", "table": "profiles" },
+      "before": null,
+      "after": {
+        "id": 3,
+        "user_id": 3,
+        "display_name": "Charlie Brown",
+        "avatar_url": "https://avatars.example.com/charlie.png",
+        "bio": "Music lover"
+      }
+    }
+  },
+  {
+    "_comment": "SCHEMA EVOLUTION: sessions table gets device_type and ip_address columns",
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704153840000,
+      "source": { "db": "accounts", "table": "sessions" },
+      "before": null,
+      "after": {
+        "id": 3,
+        "user_id": 1,
+        "token": "sess_ghi789",
+        "created_at": "2024-01-02T00:04:00Z",
+        "device_type": "mobile",
+        "ip_address": "192.168.1.100"
+      }
+    }
+  },
+  {
+    "_comment": "Update existing session with new columns",
+    "payload": {
+      "op": "u",
+      "ts_ms": 1704153900000,
+      "source": { "db": "accounts", "table": "sessions" },
+      "before": {
+        "id": 1,
+        "user_id": 1,
+        "token": "sess_abc123",
+        "created_at": "2024-01-01T00:05:00Z"
+      },
+      "after": {
+        "id": 1,
+        "user_id": 1,
+        "token": "sess_abc123",
+        "created_at": "2024-01-01T00:05:00Z",
+        "device_type": "desktop",
+        "ip_address": "10.0.0.50"
+      }
+    }
+  },
+  {
+    "_comment": "More activity with evolved schemas",
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704240000000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": null,
+      "after": {
+        "id": 5,
+        "email": "eve@example.com",
+        "username": "eve",
+        "created_at": "2024-01-03T00:00:00Z",
+        "phone_number": "+1-555-0105",
+        "verified_at": null
+      }
+    }
+  },
+  {
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704240060000,
+      "source": { "db": "accounts", "table": "profiles" },
+      "before": null,
+      "after": {
+        "id": 4,
+        "user_id": 4,
+        "display_name": "Diana Prince",
+        "avatar_url": "https://avatars.example.com/diana.png",
+        "bio": "Wonder woman"
+      }
+    }
+  },
+  {
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704240120000,
+      "source": { "db": "accounts", "table": "sessions" },
+      "before": null,
+      "after": {
+        "id": 4,
+        "user_id": 4,
+        "token": "sess_jkl012",
+        "created_at": "2024-01-03T00:02:00Z",
+        "device_type": "tablet",
+        "ip_address": "172.16.0.25"
+      }
+    }
+  },
+  {
+    "_comment": "User update - email change",
+    "payload": {
+      "op": "u",
+      "ts_ms": 1704240180000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": {
+        "id": 2,
+        "email": "bob@example.com",
+        "username": "bob",
+        "created_at": "2024-01-01T00:01:00Z"
+      },
+      "after": {
+        "id": 2,
+        "email": "bob.jones@newdomain.com",
+        "username": "bob",
+        "created_at": "2024-01-01T00:01:00Z",
+        "phone_number": "+1-555-0102",
+        "verified_at": "2024-01-03T00:03:00Z"
+      }
+    }
+  },
+  {
+    "_comment": "Delete a session (user logged out)",
+    "payload": {
+      "op": "d",
+      "ts_ms": 1704240240000,
+      "source": { "db": "accounts", "table": "sessions" },
+      "before": {
+        "id": 2,
+        "user_id": 2,
+        "token": "sess_def456",
+        "created_at": "2024-01-01T00:06:00Z"
+      },
+      "after": null
+    }
+  },
+  {
+    "_comment": "Profile update",
+    "payload": {
+      "op": "u",
+      "ts_ms": 1704240300000,
+      "source": { "db": "accounts", "table": "profiles" },
+      "before": {
+        "id": 2,
+        "user_id": 2,
+        "display_name": "Bob Jones"
+      },
+      "after": {
+        "id": 2,
+        "user_id": 2,
+        "display_name": "Robert Jones",
+        "avatar_url": "https://avatars.example.com/bob.png",
+        "bio": "Professional photographer"
+      }
+    }
+  },
+  {
+    "_comment": "Eve verifies her account",
+    "payload": {
+      "op": "u",
+      "ts_ms": 1704326400000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": {
+        "id": 5,
+        "email": "eve@example.com",
+        "username": "eve",
+        "created_at": "2024-01-03T00:00:00Z",
+        "phone_number": "+1-555-0105",
+        "verified_at": null
+      },
+      "after": {
+        "id": 5,
+        "email": "eve@example.com",
+        "username": "eve",
+        "created_at": "2024-01-03T00:00:00Z",
+        "phone_number": "+1-555-0105",
+        "verified_at": "2024-01-04T00:00:00Z"
+      }
+    }
+  },
+  {
+    "_comment": "Delete user charlie (account deactivation)",
+    "payload": {
+      "op": "d",
+      "ts_ms": 1704326460000,
+      "source": { "db": "accounts", "table": "users" },
+      "before": {
+        "id": 3,
+        "email": "charlie@example.com",
+        "username": "charlie",
+        "created_at": "2024-01-01T00:02:00Z"
+      },
+      "after": null
+    }
+  },
+  {
+    "_comment": "New session for bob after re-login",
+    "payload": {
+      "op": "c",
+      "ts_ms": 1704326520000,
+      "source": { "db": "accounts", "table": "sessions" },
+      "before": null,
+      "after": {
+        "id": 5,
+        "user_id": 2,
+        "token": "sess_mno345",
+        "created_at": "2024-01-04T00:02:00Z",
+        "device_type": "mobile",
+        "ip_address": "203.0.113.42"
+      }
+    }
+  }
+]
