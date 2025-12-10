@@ -31,8 +31,10 @@ LANGUAGE_PACKAGES=(
     erlang-ssl
     erlang-inets
     erlang-parsetools
-    php
 )
+
+# PHP package (installed separately to handle PEAR prompts)
+PHP_PACKAGE=(php)
 
 # PostgreSQL client (for testing)
 POSTGRES_PACKAGES=(
@@ -91,6 +93,12 @@ pacman -Syu --noconfirm
 
 # Install packages
 pacman -S --noconfirm "${PACKAGES[@]}"
+
+# Install PHP separately with PEAR prompts auto-answered
+if [ "$MODE" = "all" ] || [ "$MODE" = "ci" ] || [ "$MODE" = "languages" ]; then
+    echo "Installing PHP (with silent PEAR setup)..."
+    yes '' | pacman -S --noconfirm "${PHP_PACKAGE[@]}" || true
+fi
 
 # Clean up package cache to reduce image size
 if [ "$MODE" = "all" ] || [ "$MODE" = "dev" ]; then
