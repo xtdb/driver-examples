@@ -264,6 +264,32 @@ async def test_transit_verify_with_unmarshalling(conn_transit, clean_table_trans
     # Store the original parsed data for later comparison
     original_data = []
 
+    # Custom transit-JSON reader (handles the subset we need)
+    def parse_transit_value(val):
+        if isinstance(val, list) and len(val) > 0:
+            if val[0] == "^ ":
+                # It's a map: ["^ ", "~:key1", val1, "~:key2", val2, ...]
+                result = {}
+                for i in range(1, len(val), 2):
+                    if i + 1 >= len(val):
+                        break
+                    k = val[i]
+                    v = val[i + 1]
+                    # Convert keyword keys
+                    if isinstance(k, str) and k.startswith("~:"):
+                        k = k[2:]
+                    # Recursively parse values
+                    result[k] = parse_transit_value(v)
+                return result
+            else:
+                # It's an array - parse each element
+                return [parse_transit_value(item) for item in val]
+        elif isinstance(val, str) and val.startswith("~t"):
+            # Transit date - keep as ISO string
+            return val[2:]
+        else:
+            return val
+
     # Step 1: Insert using OID 16384 approach
     for line in lines:
         line = line.strip()
@@ -273,33 +299,6 @@ async def test_transit_verify_with_unmarshalling(conn_transit, clean_table_trans
         # Parse the COMPLETE transit-JSON with custom parser
         # This demonstrates that you don't need transit-python2 for reading transit-JSON
         raw_json = json.loads(line)
-
-        # Custom transit-JSON reader (handles the subset we need)
-        def parse_transit_value(val):
-            if isinstance(val, list) and len(val) > 0:
-                if val[0] == "^ ":
-                    # It's a map: ["^ ", "~:key1", val1, "~:key2", val2, ...]
-                    result = {}
-                    for i in range(1, len(val), 2):
-                        if i + 1 >= len(val):
-                            break
-                        k = val[i]
-                        v = val[i + 1]
-                        # Convert keyword keys
-                        if isinstance(k, str) and k.startswith("~:"):
-                            k = k[2:]
-                        # Recursively parse values
-                        result[k] = parse_transit_value(v)
-                    return result
-                else:
-                    # It's an array - parse each element
-                    return [parse_transit_value(item) for item in val]
-            elif isinstance(val, str) and val.startswith("~t"):
-                # Transit date - keep as ISO string
-                return val[2:]
-            else:
-                return val
-
         parsed_dict = parse_transit_value(raw_json)
         original_data.append(parsed_dict)
 

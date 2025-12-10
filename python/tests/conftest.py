@@ -3,8 +3,14 @@ import pytest_asyncio
 import psycopg as pg
 import asyncio
 import os
+import time
+import random
 
 XTDB_HOST = os.environ.get("XTDB_HOST", "xtdb")
+
+def _generate_table_name():
+    """Generate a unique table name using timestamp and random suffix."""
+    return f"test_table_{int(time.time() * 1000)}_{random.randint(0, 99999)}"
 
 # Default DB params without transit fallback (for JSON and basic tests)
 DB_PARAMS = {
@@ -44,14 +50,14 @@ async def conn_transit():
 @pytest_asyncio.fixture
 async def clean_table(conn):
     """Create a clean test table."""
-    table_name = f"test_table_{id(conn)}"
+    table_name = _generate_table_name()
     yield table_name
     # Cleanup happens automatically in XTDB (ephemeral container)
 
 @pytest_asyncio.fixture
 async def clean_table_transit(conn_transit):
     """Create a clean test table for transit connection."""
-    table_name = f"test_table_{id(conn_transit)}"
+    table_name = _generate_table_name()
     yield table_name
     # Cleanup happens automatically in XTDB (ephemeral container)
 
