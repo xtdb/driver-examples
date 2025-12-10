@@ -32,5 +32,5 @@ run = "clojure -M:dev:repl"
 description = "Run Clojure tests"
 run = """
 mise run setup
-clojure -M:test 2>&1 | grep -v 'Downloading:'
+clojure -J--add-opens=java.base/java.nio=ALL-UNNAMED -M:test 2>&1 | grep -v 'Downloading:'
 """

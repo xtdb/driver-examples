@@ -20,6 +20,9 @@
     </PackageReference>
     <PackageReference Include="Npgsql" Version="9.0.3" />
     <PackageReference Include="System.Text.Json" Version="9.0.0" />
+    <!-- Arrow ADBC Flight SQL (Interop driver wraps mature Go implementation) -->
+    <PackageReference Include="Apache.Arrow.Adbc" Version="0.21.0" />
+    <PackageReference Include="Apache.Arrow.Adbc.Drivers.Interop.FlightSql" Version="0.21.0" />
   </ItemGroup>
 
   <ItemGroup>

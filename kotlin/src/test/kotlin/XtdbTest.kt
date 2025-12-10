@@ -17,7 +17,10 @@ class XtdbTest {
     private lateinit var connection: Connection
 
     companion object {
-        private const val DB_URL = "jdbc:xtdb://xtdb:5432/xtdb"
+        private val DB_URL: String = run {
+            val host = System.getenv("XTDB_HOST") ?: "xtdb"
+            "jdbc:xtdb://$host:5432/xtdb"
+        }
         private const val DB_USER = "xtdb"
         private const val DB_PASS = ""
     }

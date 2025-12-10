@@ -27,6 +27,10 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.10.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // Arrow ADBC Flight SQL Driver (same versions as XTDB)
+    testImplementation("org.apache.arrow.adbc:adbc-driver-flight-sql:0.20.0")
+    testImplementation("org.apache.arrow:arrow-memory-netty:18.3.0")
 }
 
 application {
@@ -35,4 +39,6 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+    // Required for Apache Arrow memory access on Java 9+
+    jvmArgs("--add-opens=java.base/java.nio=ALL-UNNAMED")
 }

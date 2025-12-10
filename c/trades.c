@@ -14,7 +14,10 @@
 /* Configuration */
 #define MAX_INT_STR_LEN 32
 #define MAX_QUERY_LEN 1024
-#define DEFAULT_DB_PARAMS "host=localhost port=5432 dbname=xtdb"
+/* Note: Default uses XTDB_HOST env var if set, otherwise "xtdb" */
+#define DEFAULT_DB_HOST "xtdb"
+#define DEFAULT_DB_PORT "5432"
+#define DEFAULT_DB_NAME "xtdb"
 #define LOG_BUF_SIZE 2048
 
 /* Exit codes */
@@ -567,8 +570,11 @@ int main(int argc, char *argv[])
 
     if (pos == 0)
     {
-        strncpy(connection_string, DEFAULT_DB_PARAMS, sizeof(connection_string) - 1);
-        connection_string[sizeof(connection_string) - 1] = '\0';
+        /* Use XTDB_HOST env var if set, otherwise default to "xtdb" */
+        const char *env_host = getenv("XTDB_HOST");
+        const char *default_host = (env_host && *env_host) ? env_host : DEFAULT_DB_HOST;
+        snprintf(connection_string, sizeof(connection_string),
+                 "host=%s port=%s dbname=%s", default_host, DEFAULT_DB_PORT, DEFAULT_DB_NAME);
     }
 
     if (!connect_db(connection_string))

@@ -36,22 +36,24 @@ Feel free to hack on the examples - your Codespace is your own to explore!
 
 ## Language Feature Compatibility Matrix
 
-The following matrix shows features that are not supported in some languages:
+The following matrix shows features that are not yet tested as working in some languages (i.e. no confirmed support, PRs welcome):
 
-| Language | Transit-JSON (COPY) | Transit-Msgpack (COPY) | Transit-JSON (Parameters) |
-|----------|---------------------|------------------------|---------------------------|
-| **Python** | ✅ | ✅ | ✅ |
-| **Node.js** | ❌ | ❌ | ✅ |
-| **Go** | ✅ | ✅ | ✅ |
-| **Ruby** | ✅ | ✅ | ✅ |
-| **Java** | ✅ | ✅ | ✅ |
-| **Kotlin** | ✅ | ✅ | ✅ |
-| **C** | ✅ | ✅ | ✅ |
-| **C#** | ❌ | ❌ | ❌ |
-| **Clojure** | ✅ | ✅ | ✅ |
-| **Elixir** | ❌ | ❌ | ✅ |
-| **Babashka** | ❌ | ❌ | ❌ |
-| **PHP** | ❌ | ❌ | ✅ |
+| Language | Transit-JSON (COPY) | Transit-Msgpack (COPY) | Transit-JSON (Params) | ADBC |
+|----------|---------------------|------------------------|-----------------------|------|
+| **Python** | ✅ | ✅ | ✅ | ✅ |
+| **Node.js** | ❌ | ❌ | ✅ | ❌ |
+| **Go** | ✅ | ✅ | ✅ | ✅ |
+| **Ruby** | ✅ | ✅ | ✅ | ❌ |
+| **Java** | ✅ | ✅ | ✅ | ✅ |
+| **Kotlin** | ✅ | ✅ | ✅ | ✅ |
+| **C** | ✅ | ✅ | ✅ | ❌ |
+| **C#** | ❌ | ❌ | ❌ | ✅ |
+| **Clojure** | ✅ | ✅ | ✅ | ❌ |
+| **Elixir** | ❌ | ❌ | ✅ | ❌ |
+| **Babashka** | ❌ | ❌ | ❌ | ❌ |
+| **PHP** | ❌ | ❌ | ✅ | ❌ |
+
+[Apache Arrow ADBC](https://arrow.apache.org/adbc/) drivers connect via gRPC (port 9833) using Arrow Flight SQL for high-performance columnar data transfer. In-process ADBC usage on the JVM is also supported.
 
 ### Updating the Matrix
 
@@ -61,7 +63,7 @@ The compatibility matrix is automatically generated from test output. To regener
 python3 scripts/generate-feature-matrix.py
 ```
 
-Languages report only **unsupported** features. All features are assumed supported by default, minimizing maintenance burden.
+Languages report only **unsupported** features. All features are assumed supported by default.
 
 ### Testing
 

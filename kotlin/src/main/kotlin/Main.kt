@@ -1,8 +1,11 @@
 import java.sql.DriverManager
 
 fun main() {
+    val host = System.getenv("XTDB_HOST") ?: "xtdb"
+    val url = "jdbc:xtdb://$host:5432/xtdb"
+
     // Connect to the XTDB database using JDBC
-    DriverManager.getConnection("jdbc:xtdb://xtdb:5432/xtdb").use { connection ->
+    DriverManager.getConnection(url).use { connection ->
         connection.createStatement().use { statement ->
             // Insert records using XTDB's RECORDS syntax
             statement.execute("INSERT INTO users RECORDS {_id: 'jms', name: 'James'}, {_id: 'joe', name: 'Joe'}")

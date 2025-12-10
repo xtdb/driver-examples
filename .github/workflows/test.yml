@@ -12,110 +12,141 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    services:
-      xtdb:
-        image: ghcr.io/xtdb/xtdb:edge
-        ports:
-          - 5432:5432
-          - 8080:8080
-        options: >-
-          --health-cmd "curl --silent --fail http://localhost:8080/healthz/alive || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    container:
-      image: archlinux:base
-      options: --user root
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Essential System Dependencies
+      - name: Start XTDB with Flight SQL
         run: |
-          chmod +x $GITHUB_WORKSPACE/.devcontainer/install-system-deps.sh
-          $GITHUB_WORKSPACE/.devcontainer/install-system-deps.sh essential
+          # Create XTDB config with Flight SQL enabled
+          # Write directly to avoid mount issues
+          cat > /tmp/xtdb.yaml << 'EOF'
+          server:
+            host: '*'
+            port: 5432
 
-      - name: Create Test User
-        run: |
-          useradd -m -s /bin/bash -u 1001 runner
-          echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+          log: !Local
+            path: "/var/lib/xtdb/log"
 
-      - name: Install and configure mise
-        run: |
-          cp $GITHUB_WORKSPACE/.devcontainer/setup-mise.sh /tmp/setup-mise.sh
-          chmod +x /tmp/setup-mise.sh
-          su - runner -c "/tmp/setup-mise.sh runner $GITHUB_WORKSPACE"
-          rm /tmp/setup-mise.sh
+          storage: !Local
+            path: "/var/lib/xtdb/buffers"
 
-      - name: Install Language Runtimes
-        run: |
-          chown -R runner:runner $GITHUB_WORKSPACE
-          su - runner -c "cd $GITHUB_WORKSPACE && ~/.local/bin/mise install"
+          healthz:
+            host: '*'
+            port: 8080
 
-      - name: Install Language-Specific Tools
-        run: |
-          su - runner -c "cd $GITHUB_WORKSPACE && for dir in python csharp babashka; do
-            if [ -d \"\$dir\" ] && [ -f \"\$dir/.mise.toml\" ]; then
-              echo \"Installing mise tools for \$dir...\"
-              (cd \"\$dir\" && ~/.local/bin/mise install) || echo \"Warning: Failed to install tools for \$dir\"
-            fi
-          done"
+          flightSql:
+            host: '*'
+            port: 9833
+          EOF
 
-      - name: Setup Language Runtime Packages
-        run: |
-          # Install system packages for Ruby, Elixir, PHP
-          $GITHUB_WORKSPACE/.devcontainer/install-system-deps.sh languages
+          # Remove leading whitespace from heredoc (caused by YAML indentation)
+          sed -i 's/^          //' /tmp/xtdb.yaml
 
-      - name: Setup Language Tools (Clojure, Elixir, PHP)
-        run: |
-          cp $GITHUB_WORKSPACE/.devcontainer/setup-language-tools.sh /tmp/setup-language-tools.sh
-          chmod +x /tmp/setup-language-tools.sh
-          su - runner -c "/tmp/setup-language-tools.sh all"
-          rm /tmp/setup-language-tools.sh
+          # Verify config
+          echo "XTDB config:"
+          cat /tmp/xtdb.yaml
 
-      - name: Install Language Dependencies
-        run: |
-          su - runner -c "cd $GITHUB_WORKSPACE && \
-            eval \"\$(~/.local/bin/mise activate bash)\" && \
-            for dir in python node ruby go elixir php; do
-              if [ -d \"\$dir\" ]; then
-                echo \"Installing dependencies for \$dir...\"
-                (cd \"\$dir\" && ~/.local/bin/mise run deps 2>&1) || echo \"Warning: Failed to install deps for \$dir\"
-              fi
-            done"
+          # Start XTDB container with custom config that enables Flight SQL
+          docker run -d --name xtdb \
+            -p 5432:5432 -p 8080:8080 -p 9833:9833 \
+            -v "/tmp/xtdb.yaml:/config/xtdb.yaml:ro" \
+            ghcr.io/xtdb/xtdb:edge \
+            -f /config/xtdb.yaml
 
-      - name: Wait for XTDB to be Ready
-        run: |
+          # Wait for XTDB to be ready
           for i in {1..60}; do
-            if curl --silent --fail http://xtdb:8080/healthz/alive; then
+            if curl --silent --fail http://localhost:8080/healthz/alive 2>/dev/null; then
               echo "XTDB is ready"
-              exit 0
+              break
             fi
+            echo "Waiting for XTDB... ($i/60)"
             sleep 2
           done
-          echo "XTDB did not start in time" && exit 1
 
-      - name: Verify XTDB Connection
-        run: |
-          $GITHUB_WORKSPACE/.devcontainer/install-system-deps.sh postgres
-          su - runner -c "psql -h xtdb -U xtdb -d xtdb -c 'SELECT 1'" || echo "PostgreSQL connection test failed"
-        env:
-          PGPASSWORD: xtdb
+          # Verify it started
+          if ! curl --silent --fail http://localhost:8080/healthz/alive; then
+            echo "XTDB did not start in time"
+            docker logs xtdb
+            exit 1
+          fi
 
-      - name: Run All Tests
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull Archlinux container
+        run: docker pull archlinux:base
+
+      - name: Run tests in Archlinux container
         run: |
-          su - runner -c "cd $GITHUB_WORKSPACE && \
-            export XTDB_HOST=xtdb && \
-            export XTDB_PORT=5432 && \
-            export XTDB_USER=xtdb && \
-            export XTDB_PASSWORD=xtdb && \
-            export XTDB_DATABASE=xtdb && \
-            eval \"\$(~/.local/bin/mise activate bash)\" && \
-            ~/.local/bin/mise run test:all"
+          docker run --rm \
+            --network host \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e XTDB_HOST=localhost \
+            -e XTDB_PORT=5432 \
+            -e XTDB_USER=xtdb \
+            -e XTDB_PASSWORD=xtdb \
+            -e XTDB_DATABASE=xtdb \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            archlinux:base \
+            bash -c '
+              set -e
+
+              # Install essential deps
+              chmod +x /workspace/.devcontainer/install-system-deps.sh
+              /workspace/.devcontainer/install-system-deps.sh essential
+
+              # Create test user
+              useradd -m -s /bin/bash -u 1001 runner
+              echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+              # Install mise
+              cp /workspace/.devcontainer/setup-mise.sh /tmp/setup-mise.sh
+              chmod +x /tmp/setup-mise.sh
+              su - runner -c "/tmp/setup-mise.sh runner /workspace"
+
+              # Install language runtimes
+              chown -R runner:runner /workspace
+              su - runner -c "cd /workspace && ~/.local/bin/mise install"
+
+              # Install language-specific tools
+              su - runner -c "cd /workspace && for dir in python csharp babashka; do
+                if [ -d \"\$dir\" ] && [ -f \"\$dir/.mise.toml\" ]; then
+                  echo \"Installing mise tools for \$dir...\"
+                  (cd \"\$dir\" && ~/.local/bin/mise install) || echo \"Warning: Failed to install tools for \$dir\"
+                fi
+              done"
+
+              # Install system packages for Ruby, Elixir, PHP
+              /workspace/.devcontainer/install-system-deps.sh languages
+
+              # Setup Clojure, Elixir, PHP
+              cp /workspace/.devcontainer/setup-language-tools.sh /tmp/setup-language-tools.sh
+              chmod +x /tmp/setup-language-tools.sh
+              su - runner -c "/tmp/setup-language-tools.sh all"
+
+              # Install language dependencies
+              su - runner -c "cd /workspace && \
+                eval \"\$(~/.local/bin/mise activate bash)\" && \
+                for dir in python node ruby go elixir php; do
+                  if [ -d \"\$dir\" ]; then
+                    echo \"Installing dependencies for \$dir...\"
+                    (cd \"\$dir\" && ~/.local/bin/mise run deps 2>&1) || echo \"Warning: Failed to install deps for \$dir\"
+                  fi
+                done"
+
+              # Verify XTDB connection
+              /workspace/.devcontainer/install-system-deps.sh postgres
+              PGPASSWORD=xtdb su - runner -c "psql -h localhost -U xtdb -d xtdb -c \"SELECT 1\"" || echo "PostgreSQL connection test failed"
+
+              # Run all tests
+              su - runner -c "cd /workspace && \
+                export XTDB_HOST=localhost && \
+                export XTDB_PORT=5432 && \
+                export XTDB_USER=xtdb && \
+                export XTDB_PASSWORD=xtdb && \
+                export XTDB_DATABASE=xtdb && \
+                eval \"\$(~/.local/bin/mise activate bash)\" && \
+                ~/.local/bin/mise run test:all"
+            '
 
       - name: Upload Test Results
         if: always()
@@ -126,3 +157,7 @@ jobs:
             **/test-results/
             **/coverage/
           retention-days: 7
+
+      - name: Show XTDB logs on failure
+        if: failure()
+        run: docker logs xtdb

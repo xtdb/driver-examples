@@ -12,9 +12,17 @@ import static org.junit.jupiter.api.Assertions.*;
 public class XtdbTest {
 
     private Connection connection;
-    private static final String DB_URL = "jdbc:xtdb://xtdb:5432/xtdb";
+    private static final String DB_URL = getDbUrl();
     private static final String DB_USER = "xtdb";
     private static final String DB_PASS = "";
+
+    private static String getDbUrl() {
+        String host = System.getenv("XTDB_HOST");
+        if (host == null || host.isEmpty()) {
+            host = "xtdb";
+        }
+        return "jdbc:xtdb://" + host + ":5432/xtdb";
+    }
 
     @BeforeEach
     void setUp() throws SQLException {

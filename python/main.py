@@ -1,9 +1,11 @@
 import asyncio
+import os
 import psycopg as pg
 
 async def main():
+    xtdb_host = os.environ.get("XTDB_HOST", "xtdb")
     conn = await pg.AsyncConnection.connect(
-        host="xtdb", port=5432, dbname="xtdb", autocommit=True
+        host=xtdb_host, port=5432, dbname="xtdb", autocommit=True
     )
 
     await conn.execute(

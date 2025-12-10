@@ -1,5 +1,5 @@
 [tools]
-"asdf:mise-plugins/mise-dotnet" = "9.0"
+dotnet = "9.0"
 
 [tasks.default]
 depends = ["run"]

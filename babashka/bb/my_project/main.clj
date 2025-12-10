@@ -3,7 +3,7 @@
 
 (defn -main [& _args]
   (def db {:dbtype   "postgresql"
-           :host     "xtdb"
+           :host     (or (System/getenv "XTDB_HOST") "xtdb")
            :dbname   "xtdb"
            :port     5432})
 

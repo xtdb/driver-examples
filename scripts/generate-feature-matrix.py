@@ -17,7 +17,8 @@ from collections import defaultdict
 # Feature list (in order of appearance in matrix)
 FEATURES = [
     "Transit-Msgpack (COPY)",
-    "NEST_ONE"
+    "NEST_ONE",
+    "Arrow Flight SQL"
 ]
 
 # Language order
@@ -84,7 +85,8 @@ def parse_feature_reports(output):
     # Initialize: all languages support all features by default
     features = defaultdict(lambda: {
         "Transit-Msgpack (COPY)": True,
-        "NEST_ONE": True
+        "NEST_ONE": True,
+        "Arrow Flight SQL": True
     })
 
     # Initialize all languages
@@ -106,6 +108,8 @@ def parse_feature_reports(output):
             features[display_name]["Transit-Msgpack (COPY)"] = False
         elif feature == "nest-one":
             features[display_name]["NEST_ONE"] = False
+        elif feature == "arrow-flight-sql":
+            features[display_name]["Arrow Flight SQL"] = False
 
     return dict(features)
 

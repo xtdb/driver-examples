@@ -6,7 +6,8 @@ class XtdbOdbcTest
 {
     static async Task Main()
     {
-        var connectionString = "Host=xtdb;Port=5432;Database=xtdb;Username=xtdb;Password=xtdb;";
+        var host = Environment.GetEnvironmentVariable("XTDB_HOST") ?? "xtdb";
+        var connectionString = $"Host={host};Port=5432;Database=xtdb;Username=xtdb;Password=xtdb;";
 
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
         

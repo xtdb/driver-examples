@@ -112,7 +112,8 @@ class TransitDecoder
 end
 
 RSpec.describe "Transit-JSON Operations" do
-  let(:db) { Sequel.connect("xtdb://xtdb:5432/xtdb?fallback_output_format=transit") }
+  let(:xtdb_host) { ENV['XTDB_HOST'] || 'xtdb' }
+  let(:db) { Sequel.connect("xtdb://#{xtdb_host}:5432/xtdb?fallback_output_format=transit") }
   let(:table) { "test_table_#{Time.now.to_i}_#{rand(10000)}" }
 
   after(:each) do

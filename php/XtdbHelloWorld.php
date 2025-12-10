@@ -6,7 +6,8 @@ use pq\Connection;
 
 try {
     // Connect to XTDB
-    $connection = new Connection("host=xtdb port=5432 dbname=xtdb user=xtdb password=");
+    $xtdb_host = getenv('XTDB_HOST') ?: 'xtdb';
+    $connection = new Connection("host=$xtdb_host port=5432 dbname=xtdb user=xtdb password=");
 
     // Insert records using XTDB's RECORDS syntax
     $insert_query = "INSERT INTO users RECORDS {_id: 'jms', name: 'James'}, {_id: 'joe', name: 'Joe'}";

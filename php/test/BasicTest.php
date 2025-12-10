@@ -8,9 +8,15 @@ class BasicTest extends TestCase
 {
     private Connection $connection;
 
+    private function getXtdbHost(): string
+    {
+        return getenv('XTDB_HOST') ?: 'xtdb';
+    }
+
     protected function setUp(): void
     {
-        $this->connection = new Connection("host=xtdb port=5432 dbname=xtdb user=xtdb password=");
+        $host = $this->getXtdbHost();
+        $this->connection = new Connection("host=$host port=5432 dbname=xtdb user=xtdb password=");
     }
 
     protected function tearDown(): void

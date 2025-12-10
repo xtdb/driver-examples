@@ -1,8 +1,10 @@
 (ns user
   (:require [xtdb.api :as xt]))
 
+(def xtdb-host (or (System/getenv "XTDB_HOST") "xtdb"))
+
 (defn get-client []
-  (xt/client {:host "xtdb"
+  (xt/client {:host xtdb-host
               :port 5432
               :user "xtdb"}))
 
@@ -82,7 +84,7 @@
 
   ;; To explore the Sakila dataset using datafy/nav tooling with next.jdbc
   (defn get-jdbc-conn []
-    (jdbc/get-connection "jdbc:xtdb://xtdb:5432/xtdb?options=-c%20TimeZone=UTC"))
+    (jdbc/get-connection (str "jdbc:xtdb://" xtdb-host ":5432/xtdb?options=-c%20TimeZone=UTC")))
 
   (tap> (jdbc/execute! (get-jdbc-conn) ["select * from inventory"]
                        {:schema-opts {:pk "_id"}}))

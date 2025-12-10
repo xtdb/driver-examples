@@ -8,14 +8,16 @@
             [xtdb.next.jdbc :as xt-jdbc])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
-(def db-spec {:jdbcUrl "jdbc:xtdb://xtdb:5432/xtdb"
+(def xtdb-host (or (System/getenv "XTDB_HOST") "xtdb"))
+
+(def db-spec {:jdbcUrl (str "jdbc:xtdb://" xtdb-host ":5432/xtdb")
               :user "xtdb"
               :password ""})
 
 (def ds (jdbc/get-datasource db-spec))
 
 (defn get-client []
-  (xt/client {:host "xtdb"
+  (xt/client {:host xtdb-host
               :port 5432
               :user "xtdb"}))
 

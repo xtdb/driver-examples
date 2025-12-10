@@ -15,11 +15,13 @@ Usage:
 """
 
 import adbc_driver_flightsql.dbapi as flight_sql
-import time
+import os
 
 
 def main():
-    uri = "grpc://localhost:9833"
+    # Use XTDB_HOST env var or default to 'xtdb' for container, 'localhost' for local
+    host = os.environ.get("XTDB_HOST", "xtdb")
+    uri = f"grpc://{host}:9833"
 
     with flight_sql.connect(uri) as conn:
         with conn.cursor() as cursor:
@@ -62,7 +64,6 @@ def main():
             )
             print("   Inserted 3 rows into 'products'")
 
-            time.sleep(0.5)
 
             print("\n5. Query inserted data:")
             cursor.execute("SELECT * FROM products ORDER BY _id")
@@ -76,7 +77,6 @@ def main():
             )
             print("   Updated price for product _id=1")
 
-            time.sleep(0.5)
 
             print("\n7. Query after UPDATE:")
             cursor.execute("SELECT * FROM products ORDER BY _id")
@@ -87,7 +87,6 @@ def main():
             cursor.executemany("DELETE FROM products WHERE _id = ?", [(3,)])
             print("   Deleted product _id=3")
 
-            time.sleep(0.5)
 
             print("\n9. Query after DELETE:")
             cursor.execute("SELECT * FROM products ORDER BY _id")
@@ -106,7 +105,6 @@ def main():
             cursor.executemany("ERASE FROM products WHERE _id = ?", [(2,)])
             print("   Erased product _id=2 from all history")
 
-            time.sleep(0.5)
 
             print("\n12. Query after ERASE (FOR ALL VALID_TIME):")
             cursor.execute(

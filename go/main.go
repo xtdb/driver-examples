@@ -4,12 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func main() {
-	conn, err := pgx.Connect(context.Background(), "postgres://xtdb:5432/xtdb")
+	host := os.Getenv("XTDB_HOST")
+	if host == "" {
+		host = "xtdb"
+	}
+	connStr := fmt.Sprintf("postgres://%s:5432/xtdb", host)
+	conn, err := pgx.Connect(context.Background(), connStr)
 	if err != nil {
 		log.Fatalf("Unable to connect: %v\n", err)
 	}

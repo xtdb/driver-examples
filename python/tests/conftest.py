@@ -2,17 +2,20 @@ import pytest
 import pytest_asyncio
 import psycopg as pg
 import asyncio
+import os
+
+XTDB_HOST = os.environ.get("XTDB_HOST", "xtdb")
 
 # Default DB params without transit fallback (for JSON and basic tests)
 DB_PARAMS = {
-    "host": "xtdb",
+    "host": XTDB_HOST,
     "port": 5432,
     "dbname": "xtdb"
 }
 
 # DB params with transit fallback (for transit-specific tests only)
 DB_PARAMS_TRANSIT = {
-    "host": "xtdb",
+    "host": XTDB_HOST,
     "port": 5432,
     "dbname": "xtdb",
     "options": "-c fallback_output_format=transit"

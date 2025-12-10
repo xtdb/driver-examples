@@ -4,8 +4,14 @@ import java.sql.SQLException;
 public class XtdbHelloWorld {
 
     public static void main(String[] args) {
+        String host = System.getenv("XTDB_HOST");
+        if (host == null || host.isEmpty()) {
+            host = "xtdb";
+        }
+        String url = "jdbc:xtdb://" + host + ":5432/xtdb";
+
         try (var connection =
-                     DriverManager.getConnection("jdbc:xtdb://xtdb:5432/xtdb", "xtdb", "xtdb");
+                     DriverManager.getConnection(url, "xtdb", "xtdb");
              var statement = connection.createStatement()) {
 
             // Insert records using XTDB's RECORDS syntax

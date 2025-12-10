@@ -1,6 +1,7 @@
 require 'sequel'
 
-DB = Sequel.connect("xtdb://xtdb:5432/xtdb")
+xtdb_host = ENV['XTDB_HOST'] || 'xtdb'
+DB = Sequel.connect("xtdb://#{xtdb_host}:5432/xtdb")
 
 DB << "INSERT INTO ruby_users RECORDS {_id: 'alice', name: 'Alice'}, {_id: 'bob', name: 'Bob'}"
 

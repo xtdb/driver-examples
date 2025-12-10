@@ -791,7 +791,15 @@ TEST(transit_json_copy_from) {
 int main(void) {
     srand(time(NULL));
 
-    PGconn *conn = PQconnectdb("host=xtdb port=5432 dbname=xtdb user=xtdb password=");
+    const char *host = getenv("XTDB_HOST");
+    if (!host || *host == '\0') {
+        host = "xtdb";
+    }
+
+    char conn_str[256];
+    snprintf(conn_str, sizeof(conn_str), "host=%s port=5432 dbname=xtdb user=xtdb password=", host);
+
+    PGconn *conn = PQconnectdb(conn_str);
 
     if (PQstatus(conn) != CONNECTION_OK) {
         fprintf(stderr, "Connection failed: %s\n", PQerrorMessage(conn));

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -11,9 +12,18 @@ import (
 
 var tableCounter int
 
+func getXtdbHost() string {
+	host := os.Getenv("XTDB_HOST")
+	if host == "" {
+		host = "xtdb"
+	}
+	return host
+}
+
 // getConn creates a standard database connection (for JSON and basic tests)
 func getConn(t *testing.T) *pgx.Conn {
-	conn, err := pgx.Connect(context.Background(), "postgres://xtdb:5432/xtdb")
+	connStr := fmt.Sprintf("postgres://%s:5432/xtdb", getXtdbHost())
+	conn, err := pgx.Connect(context.Background(), connStr)
 	if err != nil {
 		t.Fatalf("Unable to connect: %v", err)
 	}
@@ -22,7 +32,8 @@ func getConn(t *testing.T) *pgx.Conn {
 
 // getConnTransit creates a database connection with transit fallback (for transit tests only)
 func getConnTransit(t *testing.T) *pgx.Conn {
-	conn, err := pgx.Connect(context.Background(), "postgres://xtdb:5432/xtdb?fallback_output_format=transit")
+	connStr := fmt.Sprintf("postgres://%s:5432/xtdb?fallback_output_format=transit", getXtdbHost())
+	conn, err := pgx.Connect(context.Background(), connStr)
 	if err != nil {
 		t.Fatalf("Unable to connect: %v", err)
 	}

@@ -1,8 +1,11 @@
 import pytest
 import psycopg as pg
+import os
+
+XTDB_HOST = os.environ.get("XTDB_HOST", "xtdb")
 
 DB_PARAMS = {
-    "host": "xtdb",
+    "host": XTDB_HOST,
     "port": 5432,
     "dbname": "xtdb"
 }

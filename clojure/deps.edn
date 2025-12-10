@@ -12,6 +12,10 @@
          ;; JSON processing
          org.clojure/data.json {:mvn/version "2.5.0"}
 
+         ;; Arrow ADBC Flight SQL (same versions as XTDB)
+         org.apache.arrow.adbc/adbc-driver-flight-sql {:mvn/version "0.20.0"}
+         org.apache.arrow/arrow-memory-netty {:mvn/version "18.3.0"}
+
          ;; helpful for debugging the loading data script
          org.clojure/tools.logging {:mvn/version "1.2.4"}
          org.slf4j/slf4j-simple {:mvn/version "2.0.9"}}

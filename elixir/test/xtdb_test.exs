@@ -8,27 +8,35 @@ defmodule XTDBTest do
     []
   )
 
+  defp get_xtdb_host do
+    System.get_env("XTDB_HOST") || "xtdb"
+  end
+
   # Standard config for JSON and basic tests (no transit fallback)
-  @db_config [
-    hostname: "xtdb",
-    port: 5432,
-    database: "xtdb",
-    username: "xtdb",
-    queue_target: 10000, # mitigation for https://github.com/xtdb/xtdb/issues/4878
-    queue_interval: 10000
-  ]
+  defp db_config do
+    [
+      hostname: get_xtdb_host(),
+      port: 5432,
+      database: "xtdb",
+      username: "xtdb",
+      queue_target: 10000, # mitigation for https://github.com/xtdb/xtdb/issues/4878
+      queue_interval: 10000
+    ]
+  end
 
   # Transit config for transit-specific tests only
-  @db_config_transit [
-    hostname: "xtdb",
-    port: 5432,
-    database: "xtdb",
-    username: "xtdb",
-    parameters: [fallback_output_format: "transit"],
-    types: XTDBTest.TransitTypes,
-    queue_target: 10000, # mitigation for https://github.com/xtdb/xtdb/issues/4878
-    queue_interval: 10000
-  ]
+  defp db_config_transit do
+    [
+      hostname: get_xtdb_host(),
+      port: 5432,
+      database: "xtdb",
+      username: "xtdb",
+      parameters: [fallback_output_format: "transit"],
+      types: XTDBTest.TransitTypes,
+      queue_target: 10000, # mitigation for https://github.com/xtdb/xtdb/issues/4878
+      queue_interval: 10000
+    ]
+  end
 
   defp get_clean_table do
     "test_table_#{System.system_time(:millisecond)}_#{:rand.uniform(10000)}"
@@ -88,7 +96,7 @@ defmodule XTDBTest do
   # Basic Operations Tests
 
   test "connection" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(db_config())
 
     result = Postgrex.query!(pid, "SELECT 1 as test", [])
     assert %Postgrex.Result{rows: [[1]]} = result
@@ -97,7 +105,7 @@ defmodule XTDBTest do
   end
 
   test "insert and query" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(db_config())
     table = get_clean_table()
 
     Postgrex.query!(
@@ -115,7 +123,7 @@ defmodule XTDBTest do
   end
 
   test "where clause" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(db_config())
     table = get_clean_table()
 
     Postgrex.query!(pid, "INSERT INTO #{table} (_id, age) VALUES (1, 25), (2, 35), (3, 45)", [])
@@ -128,7 +136,7 @@ defmodule XTDBTest do
   end
 
   test "count query" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(db_config())
     table = get_clean_table()
 
     Postgrex.query!(pid, "INSERT INTO #{table} RECORDS {_id: 1}, {_id: 2}, {_id: 3}", [])
@@ -140,7 +148,7 @@ defmodule XTDBTest do
   end
 
   test "parameterized query" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(db_config())
     table = get_clean_table()
 
     Postgrex.query!(
@@ -160,7 +168,7 @@ defmodule XTDBTest do
   # JSON Tests
 
   test "json records" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(db_config())
     table = get_clean_table()
 
     Postgrex.query!(
@@ -176,7 +184,7 @@ defmodule XTDBTest do
   end
 
   test "load sample json" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(db_config())
     table = get_clean_table()
 
     # Load sample-users.json
@@ -245,7 +253,7 @@ defmodule XTDBTest do
   # Transit-JSON Tests
 
   test "transit json format" do
-    {:ok, pid} = Postgrex.start_link(@db_config)
+    {:ok, pid} = Postgrex.start_link(db_config())
     table = get_clean_table()
 
     # Create transit-JSON
@@ -269,7 +277,7 @@ defmodule XTDBTest do
   end
 
   test "parse transit json" do
-    {:ok, pid} = Postgrex.start_link(@db_config_transit)
+    {:ok, pid} = Postgrex.start_link(db_config_transit())
     table = get_clean_table()
 
     # Load sample-users-transit.json
@@ -343,7 +351,7 @@ defmodule XTDBTest do
   end
 
   test "transit nest one full record" do
-    {:ok, pid} = Postgrex.start_link(@db_config_transit)
+    {:ok, pid} = Postgrex.start_link(db_config_transit())
     table = get_clean_table()
 
     # Load sample-users-transit.json

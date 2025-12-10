@@ -14,8 +14,14 @@ namespace XtdbTests
 {
     public class XtdbTest : IAsyncLifetime
     {
-        private const string ConnectionString = "Host=xtdb;Port=5432;Database=xtdb;Username=xtdb;Password=;Server Compatibility Mode=NoTypeLoading";
+        private static readonly string ConnectionString = GetConnectionString();
         private NpgsqlDataSource? _dataSource;
+
+        private static string GetConnectionString()
+        {
+            var host = Environment.GetEnvironmentVariable("XTDB_HOST") ?? "xtdb";
+            return $"Host={host};Port=5432;Database=xtdb;Username=xtdb;Password=;Server Compatibility Mode=NoTypeLoading";
+        }
 
         public async Task InitializeAsync()
         {

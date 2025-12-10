@@ -9,10 +9,16 @@ class TransitTest extends TestCase
 {
     private Connection $connection;
 
+    private function getXtdbHost(): string
+    {
+        return getenv('XTDB_HOST') ?: 'xtdb';
+    }
+
     protected function setUp(): void
     {
         // Connect with transit fallback output format
-        $this->connection = new Connection("host=xtdb port=5432 dbname=xtdb user=xtdb password= options='fallback_output_format=transit'");
+        $host = $this->getXtdbHost();
+        $this->connection = new Connection("host=$host port=5432 dbname=xtdb user=xtdb password= options='fallback_output_format=transit'");
     }
 
     protected function tearDown(): void

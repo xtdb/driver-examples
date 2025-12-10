@@ -36,8 +36,10 @@ const OID = {
 const transitReader = transit.reader("json");
 const transitWriter = transit.writer("json");
 
+const xtdbHost = process.env.XTDB_HOST || "xtdb";
+
 const sql = postgres({
-  host: "xtdb",
+  host: xtdbHost,
   port: 5432,
   database: "xtdb",
   fetch_types: false,

@@ -3,8 +3,10 @@ import assert from "node:assert";
 import postgres from "postgres";
 import { readFile } from "fs/promises";
 
+const xtdbHost = process.env.XTDB_HOST || "xtdb";
+
 const sql = postgres({
-  host: "xtdb",
+  host: xtdbHost,
   port: 5432,
   database: "xtdb",
   fetch_types: false,

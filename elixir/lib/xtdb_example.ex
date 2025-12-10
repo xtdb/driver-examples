@@ -1,8 +1,12 @@
 defmodule XTDBExample do
+  defp get_xtdb_host do
+    System.get_env("XTDB_HOST") || "xtdb"
+  end
+
   def connect_and_query do
     {:ok, pid} =
       Postgrex.start_link(
-        hostname: "xtdb",
+        hostname: get_xtdb_host(),
         port: 5432,
         database: "xtdb",
         username: "xtdb"
@@ -323,7 +327,7 @@ defmodule XTDBExample do
   def test_copy_simple do
     IO.puts("\n=== Testing Simple COPY FROM STDIN (like Postgrex test suite) ===")
 
-    {:ok, pid} = Postgrex.start_link(hostname: "xtdb", port: 5432, database: "xtdb", username: "xtdb")
+    {:ok, pid} = Postgrex.start_link(hostname: get_xtdb_host(), port: 5432, database: "xtdb", username: "xtdb")
 
     try do
       # Setup test table
@@ -380,7 +384,7 @@ defmodule XTDBExample do
   def test_copy_from_stdin do
     IO.puts("\n=== Testing COPY FROM STDIN with copy_data option ===")
 
-    {:ok, pid} = Postgrex.start_link(hostname: "xtdb", port: 5432, database: "xtdb", username: "xtdb")
+    {:ok, pid} = Postgrex.start_link(hostname: get_xtdb_host(), port: 5432, database: "xtdb", username: "xtdb")
 
     try do
       # Setup test table

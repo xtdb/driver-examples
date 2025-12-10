@@ -4,7 +4,7 @@
             [cheshire.core :as json]))
 
 (def db-config {:dbtype "postgresql"
-                :host "xtdb"
+                :host (or (System/getenv "XTDB_HOST") "xtdb")
                 :dbname "xtdb"
                 :port 5432})
 
