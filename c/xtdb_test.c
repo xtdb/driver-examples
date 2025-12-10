@@ -54,11 +54,6 @@ static void build_transit_string(char *buf, size_t buf_size, const char *key, co
     snprintf(buf, buf_size, "\"~:%s\",%s", key, value);
 }
 
-static void build_transit_json(char *buf, size_t buf_size, int num_pairs, ...) {
-    strcat(buf, "[\"^ \"");
-    /* Note: full implementation would use varargs, simplified for basic testing */
-}
-
 // Basic Operations Tests
 
 TEST(connection) {
@@ -643,6 +638,7 @@ TEST(transit_json_format) {
 }
 
 TEST(transit_json_encoding) {
+    (void)conn; /* This test doesn't use database connection */
     /* Test basic transit encoding format */
     char transit_buf[512] = "";
 
@@ -677,7 +673,7 @@ TEST(transit_msgpack_copy_from) {
     ASSERT(fp != NULL, "Failed to open msgpack file");
 
     fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
+    size_t file_size = (size_t)ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
     char *msgpack_data = malloc(file_size);
@@ -730,7 +726,7 @@ TEST(transit_json_copy_from) {
     ASSERT(fp != NULL, "Failed to open transit-json file");
 
     fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
+    size_t file_size = (size_t)ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
     char *json_data = malloc(file_size + 1);

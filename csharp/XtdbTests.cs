@@ -368,7 +368,7 @@ namespace XtdbTests
         }
 
         [Fact]
-        public async Task TestTransitJsonEncoding()
+        public void TestTransitJsonEncoding()
         {
             // Test transit encoding capabilities
             var data = new Dictionary<string, object>

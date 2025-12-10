@@ -433,7 +433,7 @@ defmodule XTDBExample do
               Postgrex.rollback(conn, :done)
             rescue
               e ->
-                if String.contains?(to_string(e), "COPY IN not in progress") do
+                if String.contains?(Exception.message(e), "COPY IN not in progress") do
                   IO.puts("✗ BUG REPRODUCED: 'COPY IN not in progress' error!")
                   IO.puts("  Error: #{inspect(e)}")
                   Postgrex.rollback(conn, {:error, :bug_reproduced})

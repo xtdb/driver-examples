@@ -4,6 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <Nullable>enable</Nullable>
     <!-- Suppress experimental API warnings - the PgTypeInfoResolverFactory API is marked experimental -->
     <NoWarn>$(NoWarn);NPG9001</NoWarn>
     <!-- Disable auto-generation of assembly info to avoid duplicates -->
@@ -27,6 +28,13 @@
 
   <ItemGroup>
     <ProjectReference Include="Npgsql.XtdbTransit\Npgsql.XtdbTransit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exclude XtdbHelloWorld.cs from test project - it's a standalone demo, not a test -->
+    <Compile Remove="XtdbHelloWorld.cs" />
+    <!-- Exclude Npgsql.XtdbTransit source files - they're compiled via ProjectReference -->
+    <Compile Remove="Npgsql.XtdbTransit\**\*.cs" />
   </ItemGroup>
 
 </Project>

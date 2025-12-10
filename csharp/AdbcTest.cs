@@ -83,7 +83,7 @@ public class AdbcTest : IDisposable
     }
 
     [Fact]
-    public void TestSimpleQuery()
+    public async Task TestSimpleQuery()
     {
         using var stmt = _connection.CreateStatement();
         stmt.SqlQuery = "SELECT 1 AS x, 'hello' AS greeting";
@@ -91,7 +91,7 @@ public class AdbcTest : IDisposable
         var result = stmt.ExecuteQuery();
         Assert.NotNull(result.Stream);
 
-        var batch = result.Stream.ReadNextRecordBatchAsync().Result;
+        var batch = await result.Stream.ReadNextRecordBatchAsync();
         Assert.NotNull(batch);
         Assert.Equal(1, batch.Length);
         Assert.Equal(2, batch.ColumnCount);
@@ -108,16 +108,17 @@ public class AdbcTest : IDisposable
     }
 
     [Fact]
-    public void TestQueryWithExpressions()
+    public async Task TestQueryWithExpressions()
     {
         using var stmt = _connection.CreateStatement();
         stmt.SqlQuery = "SELECT 2 + 2 AS sum, UPPER('hello') AS upper_greeting";
 
         var result = stmt.ExecuteQuery();
-        var batch = result.Stream.ReadNextRecordBatchAsync().Result;
+        Assert.NotNull(result.Stream);
+        var batch = await result.Stream!.ReadNextRecordBatchAsync();
 
         Assert.NotNull(batch);
-        Assert.Equal(1, batch.Length);
+        Assert.Equal(1, batch!.Length);
     }
 
     [Fact]
@@ -133,7 +134,7 @@ public class AdbcTest : IDisposable
     // === DML Tests ===
 
     [Fact]
-    public void TestInsertAndQuery()
+    public async Task TestInsertAndQuery()
     {
         var table = GetCleanTable();
 
@@ -154,10 +155,11 @@ public class AdbcTest : IDisposable
             using var queryStmt = _connection.CreateStatement();
             queryStmt.SqlQuery = $"SELECT * FROM {table} ORDER BY _id";
             var result = queryStmt.ExecuteQuery();
-            var batch = result.Stream.ReadNextRecordBatchAsync().Result;
+            Assert.NotNull(result.Stream);
+            var batch = await result.Stream!.ReadNextRecordBatchAsync();
 
             Assert.NotNull(batch);
-            Assert.Equal(3, batch.Length);
+            Assert.Equal(3, batch!.Length);
         }
         finally
         {
@@ -166,7 +168,7 @@ public class AdbcTest : IDisposable
     }
 
     [Fact]
-    public void TestUpdate()
+    public async Task TestUpdate()
     {
         var table = GetCleanTable();
 
@@ -190,10 +192,11 @@ public class AdbcTest : IDisposable
             using var queryStmt = _connection.CreateStatement();
             queryStmt.SqlQuery = $"SELECT price FROM {table} WHERE _id = 1";
             var result = queryStmt.ExecuteQuery();
-            var batch = result.Stream.ReadNextRecordBatchAsync().Result;
+            Assert.NotNull(result.Stream);
+            var batch = await result.Stream!.ReadNextRecordBatchAsync();
 
             Assert.NotNull(batch);
-            Assert.Equal(1, batch.Length);
+            Assert.Equal(1, batch!.Length);
         }
         finally
         {
@@ -202,7 +205,7 @@ public class AdbcTest : IDisposable
     }
 
     [Fact]
-    public void TestDelete()
+    public async Task TestDelete()
     {
         var table = GetCleanTable();
 
@@ -226,10 +229,11 @@ public class AdbcTest : IDisposable
             using var queryStmt = _connection.CreateStatement();
             queryStmt.SqlQuery = $"SELECT * FROM {table}";
             var result = queryStmt.ExecuteQuery();
-            var batch = result.Stream.ReadNextRecordBatchAsync().Result;
+            Assert.NotNull(result.Stream);
+            var batch = await result.Stream!.ReadNextRecordBatchAsync();
 
             Assert.NotNull(batch);
-            Assert.Equal(1, batch.Length);
+            Assert.Equal(1, batch!.Length);
         }
         finally
         {
@@ -238,7 +242,7 @@ public class AdbcTest : IDisposable
     }
 
     [Fact]
-    public void TestHistoricalQuery()
+    public async Task TestHistoricalQuery()
     {
         var table = GetCleanTable();
 
@@ -262,11 +266,12 @@ public class AdbcTest : IDisposable
             using var queryStmt = _connection.CreateStatement();
             queryStmt.SqlQuery = $"SELECT *, _valid_from, _valid_to FROM {table} FOR ALL VALID_TIME ORDER BY _id, _valid_from";
             var result = queryStmt.ExecuteQuery();
-            var batch = result.Stream.ReadNextRecordBatchAsync().Result;
+            Assert.NotNull(result.Stream);
+            var batch = await result.Stream!.ReadNextRecordBatchAsync();
 
             Assert.NotNull(batch);
             // Should have 2 versions
-            Assert.Equal(2, batch.Length);
+            Assert.Equal(2, batch!.Length);
         }
         finally
         {
@@ -275,7 +280,7 @@ public class AdbcTest : IDisposable
     }
 
     [Fact]
-    public void TestErase()
+    public async Task TestErase()
     {
         var table = GetCleanTable();
 
@@ -306,11 +311,12 @@ public class AdbcTest : IDisposable
             using var queryStmt = _connection.CreateStatement();
             queryStmt.SqlQuery = $"SELECT * FROM {table} FOR ALL VALID_TIME ORDER BY _id";
             var result = queryStmt.ExecuteQuery();
-            var batch = result.Stream.ReadNextRecordBatchAsync().Result;
+            Assert.NotNull(result.Stream);
+            var batch = await result.Stream!.ReadNextRecordBatchAsync();
 
             Assert.NotNull(batch);
             // Only record 2 should remain
-            Assert.Equal(1, batch.Length);
+            Assert.Equal(1, batch!.Length);
         }
         finally
         {
