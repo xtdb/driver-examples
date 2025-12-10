@@ -1,20 +1,12 @@
 (ns xtdb.xtdb-test
-  (:require [clojure.test :refer [deftest is use-fixtures]]
-            [next.jdbc :as jdbc]
+  (:require [clojure.test :refer [deftest is]]
             [clojure.java.io :as io]
             [clojure.data.json :as json]
             [cognitect.transit :as transit]
-            [xtdb.api :as xt]
-            [xtdb.next.jdbc :as xt-jdbc])
+            [xtdb.api :as xt])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 (def xtdb-host (or (System/getenv "XTDB_HOST") "xtdb"))
-
-(def db-spec {:jdbcUrl (str "jdbc:xtdb://" xtdb-host ":5432/xtdb")
-              :user "xtdb"
-              :password ""})
-
-(def ds (jdbc/get-datasource db-spec))
 
 (defn get-client []
   (xt/client {:host xtdb-host
@@ -23,10 +15,6 @@
 
 (defn get-clean-table []
   (format "test_table_%d_%d" (System/currentTimeMillis) (rand-int 10000)))
-
-(defn with-connection [f]
-  (with-open [conn (jdbc/get-connection ds)]
-    (f conn)))
 
 (defn with-client [f]
   (let [client (get-client)]
@@ -149,15 +137,17 @@
   (with-client
     (fn [client]
       (let [table (get-clean-table)
-            lines (line-seq (io/reader "../test-data/sample-users-transit.json"))]
+            lines (line-seq (io/reader "../test-data/sample-users-transit.json"))
+            ;; Parse all transit-JSON lines into Clojure data
+            users (->> lines
+                       (remove clojure.string/blank?)
+                       (mapv (fn [line]
+                               (let [in (ByteArrayInputStream. (.getBytes line))
+                                     reader (transit/reader in :json)]
+                                 (transit/read reader)))))]
 
-        ;; Parse transit-JSON and insert using XTDB client
-        ;; The client handles keyword keys directly
-        (doseq [line (remove clojure.string/blank? lines)]
-          (let [in (ByteArrayInputStream. (.getBytes line))
-                reader (transit/reader in :json)
-                user-data (transit/read reader)]
-            (xt/execute-tx client [[(format "INSERT INTO %s RECORDS ?" table) user-data]])))
+        ;; Bulk insert using :put-docs - handles COPY optimization automatically
+        (xt/execute-tx client [(into [:put-docs (keyword table)] users)])
 
         ;; Query back and verify
         ;; XTDB client returns _id as :xt/id (XTDB's internal convention)
@@ -165,32 +155,6 @@
           (is (= 3 (count results)))
           (let [first-result (first results)]
             (is (= "alice" (:xt/id first-result)))
-            (is (= "Alice Smith" (:name first-result)))
-            (is (= 30 (:age first-result)))
-            (is (true? (:active first-result)))))))))
-
-(deftest test-transit-json-copy-from
-  (with-connection
-    (fn [conn]
-      (let [table (get-clean-table)
-            transit-json-data (slurp "../test-data/sample-users-transit.json")]
-
-        ;; Use COPY FROM STDIN with transit-json format
-        ;; This is the only test that requires JDBC for COPY operations
-        (let [copy-in (xt-jdbc/copy-in conn (format "COPY %s FROM STDIN WITH (FORMAT 'transit-json')" table))
-              lines (clojure.string/split-lines transit-json-data)]
-          ;; Send the transit-json data line by line
-          (doseq [line lines]
-            (when-not (clojure.string/blank? line)
-              (let [bytes (.getBytes (str line "\n"))]
-                (.writeToCopy copy-in bytes 0 (alength bytes)))))
-          (.endCopy copy-in))
-
-        ;; Verify 3 records are loaded
-        (let [results (jdbc/execute! conn [(format "SELECT _id, name, age, active FROM %s ORDER BY _id" table)])]
-          (is (= 3 (count results)))
-          (let [first-result (first results)]
-            (is (= "alice" (:_id first-result)))
             (is (= "Alice Smith" (:name first-result)))
             (is (= 30 (:age first-result)))
             (is (true? (:active first-result)))))))))

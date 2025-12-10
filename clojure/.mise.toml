@@ -34,3 +34,24 @@ run = """
 mise run setup
 clojure -J--add-opens=java.base/java.nio=ALL-UNNAMED -M:test 2>&1 | grep -v 'Downloading:'
 """
+
+[tasks.sakila-load]
+description = "Load Sakila dataset using put-docs"
+run = """
+mise run setup
+clojure -J--add-opens=java.base/java.nio=ALL-UNNAMED -M -m load-data ../sample-datasets/sakila/tsv 2>&1 | grep -v 'Downloading:'
+"""
+
+[tasks.sakila-verify]
+description = "Verify Sakila dataset was loaded correctly"
+run = """
+mise run setup
+clojure -J--add-opens=java.base/java.nio=ALL-UNNAMED -M -m verify-data 2>&1 | grep -v 'Downloading:'
+"""
+
+[tasks.test-sakila]
+description = "Load and verify Sakila dataset (tests load_data.clj and verify_data.clj)"
+run = """
+mise run sakila-load
+mise run sakila-verify
+"""

@@ -1,25 +1,25 @@
 (ns verify-data
-  (:require [next.jdbc :as jdbc]
-            [xtdb.next.jdbc :as xt-jdbc]
-            [clojure.tools.logging :as log]))
+  (:require [clojure.tools.logging :as log]
+            [xtdb.api :as xt]))
 
-(def db-spec {:dbtype "xtdb"
-              :dbname "xtdb"
-              :host "xtdb" ;; Uses "xtdb" for GitHub Actions and DevContainer
-              :user "your-username"
-              :password "your-password"})
+(def xtdb-host (or (System/getenv "XTDB_HOST") "xtdb"))
+
+(defn get-client []
+  (xt/client {:host xtdb-host
+              :port 5432
+              :user "xtdb"}))
 
 (defn verify []
-  (with-open [conn (jdbc/get-connection db-spec)]
-    (let [result (jdbc/execute-one! conn ["SELECT count(*) as c FROM rental"])]
-      (if (= (:c result) 16044)
-        (do
-          (log/info "✅ Data verification passed")
-          (println result)
-          (System/exit 0))
-        (do
-          (log/error "❌ Data verification failed")
-          (System/exit 1))))))
+  (let [client (get-client)
+        result (first (xt/q client ["SELECT count(*) as c FROM rental"]))]
+    (if (= (:c result) 16044)
+      (do
+        (log/info "Data verification passed")
+        (println result)
+        (System/exit 0))
+      (do
+        (log/error "Data verification failed")
+        (System/exit 1)))))
 
 (defn -main [& args]
   (verify))

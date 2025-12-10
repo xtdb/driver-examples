@@ -1,14 +1,17 @@
 (ns load-data
   (:require [clojure.java.io :as io]
+            [clojure.set :as set]
             [clojure.string :as str]
-            [next.jdbc :as jdbc]
-            [clojure.tools.logging :as log]))
+            [clojure.tools.logging :as log]
+            [xtdb.api :as xt]))
 
 ;; Database connection details (adjust as needed)
-(def db-spec {:dbtype "xtdb"
-              :dbname "xtdb"
-              :host "xtdb"
-              :user "xtdb"})
+(def xtdb-host (or (System/getenv "XTDB_HOST") "xtdb"))
+
+(defn get-client []
+  (xt/client {:host xtdb-host
+              :port 5432
+              :user "xtdb"}))
 
 (defn read-tsv-files [dir]
   "Reads all TSV files from the given directory. Returns a map of table-name to file-path."
@@ -87,8 +90,8 @@
               (assoc "_id" tbl-id))
           parsed-record)))))
 
-(defn insert-tsv-into-db! [conn table-name file-path]
-  "Reads a TSV file, processes its contents in batches, and inserts data into the database using RECORDS."
+(defn insert-tsv-into-db! [client table-name file-path]
+  "Reads a TSV file, processes its contents in batches, and inserts data into the database using :put-docs."
   (log/info "Processing file for table:" table-name)
   (with-open [reader (io/reader file-path)]
     (let [lines (line-seq reader)]
@@ -101,15 +104,15 @@
                                (partition-all batch-size)
                                (transduce
                                  (map (fn [record-batch]
-                                        (jdbc/with-transaction [tx conn]
-                                          (with-open [ps (jdbc/prepare tx [(str "INSERT INTO " table-name " RECORDS ?")])]
-                                            (jdbc/execute-batch! ps (map vector record-batch))))
+                                        ;; Use :put-docs for bulk insert
+                                        (xt/execute-tx client [(into [:put-docs (keyword table-name)]
+                                                                     (map #(set/rename-keys % {"_id" :xt/id}) record-batch))])
                                         (count record-batch)))
                                  + 0))]
           (log/debug "Finished inserting" total-count "records for table:" table-name))))))
 
 
-(defn process-tsv-files [conn dir]
+(defn process-tsv-files [client dir]
   "Reads and inserts all TSV files from the directory into the database."
   (let [tsv-files (read-tsv-files dir)]
     (if (empty? tsv-files)
@@ -117,7 +120,7 @@
       (doseq [[table-name file-path] tsv-files]
         (log/info "Inserting data for table:" table-name "from file:" file-path)
         (try
-          (insert-tsv-into-db! conn table-name file-path)
+          (insert-tsv-into-db! client table-name file-path)
           (log/info "Finished inserting data for table:" table-name)
           (catch Exception e
             (log/error e "Error inserting data for table:" table-name)))))))
@@ -126,7 +129,7 @@
   (if (not (seq args))
     (log/error "Usage: clj -M -m main <path-to-tsv-directory>")
     (let [dir (first args)
-          conn (jdbc/get-datasource db-spec)]
+          client (get-client)]
       (log/info "Processing TSV files from directory:" dir)
-      (process-tsv-files conn dir)
+      (process-tsv-files client dir)
       (log/info "All TSV files have been processed."))))
