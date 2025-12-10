@@ -42,7 +42,6 @@ const sql = postgres({
   host: xtdbHost,
   port: 5432,
   database: "xtdb",
-  fetch_types: false,
 
   connection: {
     // Record objects will be returned fully typed using the transit format:
@@ -70,12 +69,6 @@ const sql = postgres({
       },
     },
 
-    bool: { to: 16 },
-    int: {
-      to: 20,
-      from: [23, 20],
-      parse: parseInt,
-    },
   },
 });
 
