@@ -105,7 +105,7 @@ jobs:
 
               # Install language runtimes
               chown -R runner:runner /workspace
-              su - runner -c "cd /workspace && ~/.local/bin/mise install"
+              su - runner -c "cd /workspace && MISE_NODE_VERIFY=false ~/.local/bin/mise install"
 
               # Install language-specific tools
               su - runner -c "cd /workspace && for dir in python csharp babashka; do
