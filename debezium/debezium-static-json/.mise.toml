@@ -1,6 +1,9 @@
 [tools]
 go = "1.21"
 
+[env]
+XTDB_HOST = "xtdb"
+
 [tasks.deps]
 description = "Install Go dependencies"
 run = "go mod download && go mod tidy"
@@ -18,7 +21,7 @@ run = "go run . cdc/events.json"
 [tasks.clean]
 description = "Clean tables in XTDB for re-run"
 run = """
-psql "${XTDB_URL:-postgres://xtdb:xtdb@localhost:5432/xtdb}" -c "
+psql -h "$XTDB_HOST" -p 5432 -U xtdb -d xtdb -c "
 DELETE FROM users WHERE 1=1;
 DELETE FROM profiles WHERE 1=1;
 DELETE FROM sessions WHERE 1=1;
@@ -31,12 +34,12 @@ depends = ["clean", "run"]
 
 [tasks.query]
 description = "Run example queries"
-run = "psql \"${XTDB_URL:-postgres://xtdb:xtdb@localhost:5432/xtdb}\" -f sql/queries.sql"
+run = "psql -h \"$XTDB_HOST\" -p 5432 -U xtdb -d xtdb -f sql/queries.sql"
 
 [tasks.test]
 description = "Verify data was ingested correctly"
 run = """
-psql "${XTDB_URL:-postgres://xtdb:xtdb@localhost:5432/xtdb}" -c "
+psql -h "$XTDB_HOST" -p 5432 -U xtdb -d xtdb -c "
 SELECT 'users' as table_name, COUNT(*) as count FROM users
 UNION ALL
 SELECT 'profiles', COUNT(*) FROM profiles

@@ -1,0 +1,9 @@
+# MySQL data directory (mise-managed server)
+mysql-data/
+
+# CDC state files
+data/
+
+# Maven build output
+target/
+dependency-reduced-pom.xml

@@ -1,0 +1,207 @@
+[tools]
+java = "21"
+maven = "3.9"
+
+[env]
+MYSQL_HOST = "127.0.0.1"
+MYSQL_PORT = "3306"
+MYSQL_USER = "cdc_user"
+MYSQL_PASSWORD = "cdc_password"
+MYSQL_DATABASE = "accounts"
+MYSQL_DATA_DIR = "mysql-data"
+XTDB_HOST = "xtdb"
+
+[tasks.build]
+description = "Build the CDC JAR (supports both embedded and sink modes)"
+run = "mvn clean package -DskipTests"
+
+[tasks.run]
+description = "Run embedded CDC against MySQL"
+depends = ["build"]
+run = "java -jar target/debezium-xtdb-1.0.0-SNAPSHOT.jar"
+
+[tasks.reset]
+description = "Reset CDC state"
+run = """
+#!/bin/bash
+rm -rf data/*
+mkdir -p data
+echo "CDC state reset"
+"""
+
+[tasks.demo]
+description = "Start MySQL, reset CDC state, and run"
+depends = ["mysql-setup", "reset", "run"]
+
+[tasks.deploy-sink]
+description = "Deploy sink JAR to Debezium Server lib/"
+depends = ["build"]
+run = """
+#!/bin/bash
+DEBEZIUM_DIR="${DEBEZIUM_DIR:-../debezium-mysql-standalone/debezium-server}"
+if [ ! -d "$DEBEZIUM_DIR/lib" ]; then
+    echo "Debezium Server not found at $DEBEZIUM_DIR"
+    echo "Set DEBEZIUM_DIR or download Debezium Server first"
+    exit 1
+fi
+cp target/debezium-xtdb-1.0.0-SNAPSHOT.jar "$DEBEZIUM_DIR/lib/"
+echo "Deployed to $DEBEZIUM_DIR/lib/"
+"""
+
+[tasks.mysql-writer]
+description = "Continuously write to MySQL (generates CDC events)"
+run = "scripts/mysql-writer.sh"
+
+[tasks.xtdb-poller]
+description = "Poll XTDB to show updates flowing in"
+run = "scripts/xtdb-poller.sh"
+
+[tasks.clean]
+description = "Clean build and CDC state"
+run = """
+#!/bin/bash
+mvn clean
+rm -rf data/*
+echo "Cleaned"
+"""
+
+[tasks.mysql-install]
+description = "Install MariaDB via system package manager"
+run = """
+#!/bin/bash
+set -e
+if command -v mariadbd &>/dev/null; then
+    echo "MariaDB already installed"
+    exit 0
+fi
+echo "Installing MariaDB..."
+sudo pacman -S --noconfirm mariadb
+echo "MariaDB installed"
+"""
+
+[tasks.mysql-init]
+description = "Initialize MySQL data directory (one-time)"
+depends = ["mysql-install"]
+run = """
+#!/bin/bash
+set -e
+if [ -d "$MYSQL_DATA_DIR/mysql" ]; then
+    echo "MySQL already initialized in $MYSQL_DATA_DIR"
+    exit 0
+fi
+mkdir -p "$MYSQL_DATA_DIR"
+echo "Initializing MariaDB data directory..."
+mariadb-install-db --datadir="$PWD/$MYSQL_DATA_DIR" --auth-root-authentication-method=normal
+echo "MariaDB initialized (root has no password)"
+"""
+
+[tasks.mysql-start]
+description = "Start MySQL server with binlog enabled"
+depends = ["mysql-init"]
+run = """
+#!/bin/bash
+set -e
+PIDFILE="$PWD/$MYSQL_DATA_DIR/mariadbd.pid"
+if [ -f "$PIDFILE" ] && kill -0 $(cat "$PIDFILE") 2>/dev/null; then
+    echo "MariaDB already running (PID $(cat $PIDFILE))"
+    exit 0
+fi
+echo "Starting MariaDB on port $MYSQL_PORT..."
+mariadbd \
+    --datadir="$PWD/$MYSQL_DATA_DIR" \
+    --port="$MYSQL_PORT" \
+    --socket="$PWD/$MYSQL_DATA_DIR/mysql.sock" \
+    --pid-file="$PIDFILE" \
+    --log-bin=mysql-bin \
+    --binlog-format=ROW \
+    --server-id=1 \
+    --binlog-row-image=FULL \
+    --log-error="$PWD/$MYSQL_DATA_DIR/error.log" \
+    &
+sleep 2
+if [ -f "$PIDFILE" ]; then
+    echo "MariaDB started (PID $(cat $PIDFILE))"
+else
+    echo "Failed to start MariaDB - check $MYSQL_DATA_DIR/error.log"
+    exit 1
+fi
+"""
+
+[tasks.mysql-stop]
+description = "Stop MySQL server"
+run = """
+#!/bin/bash
+PIDFILE="$PWD/$MYSQL_DATA_DIR/mariadbd.pid"
+if [ -f "$PIDFILE" ]; then
+    PID=$(cat "$PIDFILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        echo "Stopping MariaDB (PID $PID)..."
+        kill "$PID"
+        sleep 2
+        echo "MariaDB stopped"
+    else
+        echo "MariaDB not running"
+        rm -f "$PIDFILE"
+    fi
+else
+    echo "MariaDB not running (no PID file)"
+fi
+"""
+
+[tasks.mysql-setup]
+description = "Create CDC user, database, and tables"
+depends = ["mysql-start"]
+run = """
+#!/bin/bash
+set -e
+SOCK="$PWD/$MYSQL_DATA_DIR/mysql.sock"
+echo "Setting up database and CDC user..."
+mariadb -u root --socket="$SOCK" <<'SQL'
+CREATE DATABASE IF NOT EXISTS accounts;
+CREATE USER IF NOT EXISTS 'cdc_user'@'%' IDENTIFIED BY 'cdc_password';
+GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc_user'@'%';
+GRANT ALL PRIVILEGES ON accounts.* TO 'cdc_user'@'%';
+FLUSH PRIVILEGES;
+
+USE accounts;
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY,
+    email VARCHAR(255),
+    username VARCHAR(100),
+    phone_number VARCHAR(20),
+    created_at DATETIME,
+    verified_at DATETIME
+);
+
+-- Seed some initial data
+INSERT IGNORE INTO users (id, email, username, created_at) VALUES
+    (1, 'alice@example.com', 'alice', NOW()),
+    (2, 'bob@example.com', 'bob', NOW()),
+    (3, 'charlie@example.com', 'charlie', NOW()),
+    (4, 'diana@example.com', 'diana', NOW()),
+    (5, 'eve@example.com', 'eve', NOW());
+SQL
+echo "Database setup complete - 5 seed users created"
+"""
+
+[tasks.mysql-status]
+description = "Check MySQL server status"
+run = """
+#!/bin/bash
+PIDFILE="$PWD/$MYSQL_DATA_DIR/mariadbd.pid"
+if [ -f "$PIDFILE" ] && kill -0 $(cat "$PIDFILE") 2>/dev/null; then
+    echo "MariaDB running (PID $(cat $PIDFILE)) on port $MYSQL_PORT"
+    mariadb -u root --socket="$PWD/$MYSQL_DATA_DIR/mysql.sock" -e "SELECT COUNT(*) as user_count FROM accounts.users" 2>/dev/null || true
+else
+    echo "MariaDB not running"
+fi
+"""
+
+[tasks.mysql-clean]
+description = "Stop MySQL and remove data directory"
+depends = ["mysql-stop"]
+run = """
+#!/bin/bash
+rm -rf "$MYSQL_DATA_DIR"
+echo "MySQL data directory removed"
+"""

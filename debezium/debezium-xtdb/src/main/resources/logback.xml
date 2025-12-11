@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%logger{20}] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Reduce noise -->
+    <logger name="io.debezium" level="INFO"/>
+    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="com.github.shyiko.mysql.binlog" level="INFO"/>
+
+    <!-- Our code -->
+    <logger name="com.xtdb.debezium" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
