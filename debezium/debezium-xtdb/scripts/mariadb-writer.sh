@@ -15,8 +15,12 @@ if ! command -v mariadb &>/dev/null; then
 fi
 
 counter=100
+column_counter=1
+last_column_time=$(date +%s)
+COLUMN_INTERVAL="${COLUMN_INTERVAL:-30}"
 
 echo "Writing to MariaDB every ${INTERVAL}s (Ctrl+C to stop)"
+echo "Adding new column every ${COLUMN_INTERVAL}s to demonstrate schema evolution"
 echo "Host: $MYSQL_HOST:$MYSQL_PORT"
 echo ""
 
@@ -24,7 +28,24 @@ mysql_cmd() {
     mariadb -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -e "$1" 2>&1
 }
 
+add_column_if_due() {
+    now=$(date +%s)
+    elapsed=$((now - last_column_time))
+    if [ $elapsed -ge $COLUMN_INTERVAL ]; then
+        col_name="custom_field_${column_counter}"
+        echo ""
+        echo "[$(date +%H:%M:%S)] *** SCHEMA CHANGE: Adding column '$col_name' ***"
+        mysql_cmd "ALTER TABLE users ADD COLUMN $col_name VARCHAR(100)"
+        echo "[$(date +%H:%M:%S)] *** XTDB will automatically adapt to the new schema ***"
+        echo ""
+        column_counter=$((column_counter + 1))
+        last_column_time=$now
+    fi
+}
+
 while true; do
+    add_column_if_due
+
     username="user_${counter}"
     email="${username}@example.com"
 
@@ -33,9 +54,14 @@ while true; do
 
     case $op in
         0)
-            # INSERT new user
+            # INSERT new user (include value for latest custom field if any exist)
             echo "[$(date +%H:%M:%S)] INSERT: $username"
-            mysql_cmd "INSERT INTO users (id, email, username, created_at) VALUES ($counter, '$email', '$username', NOW())"
+            if [ $column_counter -gt 1 ]; then
+                latest_col="custom_field_$((column_counter - 1))"
+                mysql_cmd "INSERT INTO users (id, email, username, created_at, $latest_col) VALUES ($counter, '$email', '$username', NOW(), 'value_${counter}')"
+            else
+                mysql_cmd "INSERT INTO users (id, email, username, created_at) VALUES ($counter, '$email', '$username', NOW())"
+            fi
             ;;
         1)
             # UPDATE existing user (previous one)

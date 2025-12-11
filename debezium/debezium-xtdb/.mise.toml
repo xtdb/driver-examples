@@ -50,7 +50,7 @@ echo "Deployed to $DEBEZIUM_DIR/lib/"
 
 [tasks.mariadb-writer]
 description = "Continuously write to MariaDB (generates CDC events)"
-run = "scripts/mysql-writer.sh"
+run = "scripts/mariadb-writer.sh"
 
 [tasks.xtdb-poller]
 description = "Poll XTDB to show updates flowing in"
