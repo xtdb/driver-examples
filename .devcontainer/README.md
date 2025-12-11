@@ -54,3 +54,7 @@ A helpful command for running inside the container as a poor man's sandbox:
 # within that shell, run a fresh Claude login with max permissions (use at your own risk!!)
 npm install -g @anthropic-ai/claude-code && claude --dangerously-skip-permissions --resume
 ```
+
+## App Image Rebuild
+
+`docker compose build --no-cache app`

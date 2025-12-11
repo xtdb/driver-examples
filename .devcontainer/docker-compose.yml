@@ -10,10 +10,11 @@ services:
     user: root
 
   app:
+    image: driver-examples-app:latest
+    pull_policy: build
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile.dev
-      # image: "mcr.microsoft.com/devcontainers/universal:2"
     container_name: app
 
     security_opt:

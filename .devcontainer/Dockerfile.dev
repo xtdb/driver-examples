@@ -27,8 +27,9 @@ ENV PATH="/home/codespace/.local/bin:${PATH}"
 COPY --chown=codespace:codespace .tool-versions /tmp/.tool-versions
 
 # Install language runtimes during build
+# MISE_NODE_VERIFY=false skips GPG verification for Node.js (keys often lag behind releases)
 RUN cd /tmp && \
-    ~/.local/bin/mise install && \
+    MISE_NODE_VERIFY=false ~/.local/bin/mise install && \
     rm /tmp/.tool-versions
 
 # Install language-specific tools (Clojure, Elixir, PHP Composer)

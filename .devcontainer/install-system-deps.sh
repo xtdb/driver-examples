@@ -11,6 +11,7 @@ ESSENTIAL_PACKAGES=(
     rlwrap
     sudo
     git
+    gnupg
     python
     python-pip
 )
