@@ -30,8 +30,8 @@ echo "CDC state reset"
 """
 
 [tasks.demo]
-description = "Start MySQL, reset CDC state, and run"
-depends = ["mysql-setup", "reset", "run"]
+description = "Start MariaDB, reset CDC state, and run"
+depends = ["mariadb-setup", "reset", "build", "run"]
 
 [tasks.deploy-sink]
 description = "Deploy sink JAR to Debezium Server lib/"
@@ -48,8 +48,8 @@ cp target/debezium-xtdb-1.0.0-SNAPSHOT.jar "$DEBEZIUM_DIR/lib/"
 echo "Deployed to $DEBEZIUM_DIR/lib/"
 """
 
-[tasks.mysql-writer]
-description = "Continuously write to MySQL (generates CDC events)"
+[tasks.mariadb-writer]
+description = "Continuously write to MariaDB (generates CDC events)"
 run = "scripts/mysql-writer.sh"
 
 [tasks.xtdb-poller]
@@ -65,7 +65,7 @@ rm -rf data/*
 echo "Cleaned"
 """
 
-[tasks.mysql-install]
+[tasks.mariadb-install]
 description = "Install MariaDB via system package manager"
 run = """
 #!/bin/bash
@@ -79,9 +79,9 @@ sudo pacman -S --noconfirm mariadb
 echo "MariaDB installed"
 """
 
-[tasks.mysql-init]
-description = "Initialize MySQL data directory (one-time)"
-depends = ["mysql-install"]
+[tasks.mariadb-init]
+description = "Initialize MariaDB data directory (one-time)"
+depends = ["mariadb-install"]
 run = """
 #!/bin/bash
 set -e
@@ -95,9 +95,9 @@ mariadb-install-db --datadir="$PWD/$MYSQL_DATA_DIR" --auth-root-authentication-m
 echo "MariaDB initialized (root has no password)"
 """
 
-[tasks.mysql-start]
-description = "Start MySQL server with binlog enabled"
-depends = ["mysql-init"]
+[tasks.mariadb-start]
+description = "Start MariaDB server with binlog enabled"
+depends = ["mariadb-init"]
 run = """
 #!/bin/bash
 set -e
@@ -127,8 +127,8 @@ else
 fi
 """
 
-[tasks.mysql-stop]
-description = "Stop MySQL server"
+[tasks.mariadb-stop]
+description = "Stop MariaDB server"
 run = """
 #!/bin/bash
 PIDFILE="$PWD/$MYSQL_DATA_DIR/mariadbd.pid"
@@ -148,9 +148,9 @@ else
 fi
 """
 
-[tasks.mysql-setup]
+[tasks.mariadb-setup]
 description = "Create CDC user, database, and tables"
-depends = ["mysql-start"]
+depends = ["mariadb-start"]
 run = """
 #!/bin/bash
 set -e
@@ -187,8 +187,8 @@ SQL
 echo "Database setup complete - 5 seed users created"
 """
 
-[tasks.mysql-status]
-description = "Check MySQL server status"
+[tasks.mariadb-status]
+description = "Check MariaDB server status"
 run = """
 #!/bin/bash
 PIDFILE="$PWD/$MYSQL_DATA_DIR/mariadbd.pid"
@@ -200,11 +200,11 @@ else
 fi
 """
 
-[tasks.mysql-clean]
-description = "Stop MySQL and remove data directory"
-depends = ["mysql-stop"]
+[tasks.mariadb-clean]
+description = "Stop MariaDB and remove data directory"
+depends = ["mariadb-stop"]
 run = """
 #!/bin/bash
 rm -rf "$MYSQL_DATA_DIR"
-echo "MySQL data directory removed"
+echo "MariaDB data directory removed"
 """
