@@ -17,7 +17,8 @@
       "extensions": [
         "mtxr.sqltools",
         "mtxr.sqltools-driver-pg",
-	"betterthantomorrow.calva"
+        "mtxr.sqltools-driver-mysql",
+        "betterthantomorrow.calva"
       ],
       "settings": {
         "sqltools.connections": [
