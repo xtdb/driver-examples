@@ -24,7 +24,7 @@ public class XtdbWriter implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(XtdbWriter.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_INSTANT;
+    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
     private final Connection connection;
     private final String idField;
