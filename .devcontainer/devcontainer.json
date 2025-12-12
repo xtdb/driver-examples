@@ -12,6 +12,18 @@
    "storage": "64gb"
   },
 
+  "forwardPorts": [3000, 3909],
+  "portsAttributes": {
+    "3000": {
+      "label": "Metabase",
+      "onAutoForward": "notify"
+    },
+    "3909": {
+      "label": "Garage WebUI",
+      "onAutoForward": "notify"
+    }
+  },
+
   "customizations": {
     "vscode": {
       "extensions": [
