@@ -11,7 +11,7 @@ services:
 
   app:
     image: driver-examples-app:latest
-    pull_policy: build
+    pull_policy: never
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile.dev
