@@ -33,6 +33,20 @@ mise run demo    # Installs MariaDB, starts it, runs CDC
 
 The module also includes a Debezium Server sink connector for deployment with standalone Debezium Server.
 
+### [cdc-demo](./cdc-demo/)
+
+**Docker Compose end-to-end demo** - Full stack with Postgres, Debezium Connect, Kafka, and XTDB's built-in `debezium-cdc` module.
+
+- Postgres source (WAL-based CDC)
+- Kafka as the message bus
+- Uses XTDB's native CDC ingestion (no custom code)
+- Fully self-contained via docker-compose
+
+```bash
+cd cdc-demo
+docker compose up -d
+```
+
 ## Key Concepts
 
 ### Schema-less Ingestion
@@ -63,14 +77,15 @@ The demos handle both full Debezium envelope format and the flattened format (vi
 
 ## Comparison
 
-| Feature | Static JSON | Live CDC (debezium-xtdb) |
-|---------|-------------|--------------------------|
-| Real database | No | Yes (MySQL/MariaDB) |
-| Kafka required | No | No |
-| CDC engine | None | Debezium Embedded |
-| Latency | N/A | Sub-second |
-| Setup complexity | Minimal | Medium (MariaDB install) |
-| Best for | Learning | Development/Testing |
+| Feature | Static JSON | Live CDC (debezium-xtdb) | Docker Compose (cdc-demo) |
+|---------|-------------|--------------------------|---------------------------|
+| Real database | No | Yes (MySQL/MariaDB) | Yes (Postgres) |
+| Kafka required | No | No | Yes |
+| CDC engine | None | Debezium Embedded | Debezium Connect |
+| XTDB ingestion | Custom (JDBC) | Custom (JDBC) | Built-in `debezium-cdc` |
+| Latency | N/A | Sub-second | Sub-second |
+| Setup complexity | Minimal | Medium (MariaDB install) | Medium (Docker) |
+| Best for | Learning | Development/Testing | Production-like demo |
 
 ## Architecture
 
