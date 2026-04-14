@@ -1,6 +1,8 @@
 logClusters:
   kafkaCluster: !Kafka
-    bootstrapServers: "redpanda:9092"
+    bootstrapServers: "tansu:9092"
+    propertiesMap:
+      "compression.type": "none"
 
 log: !Kafka
   cluster: kafkaCluster

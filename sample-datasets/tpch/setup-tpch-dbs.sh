@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Setup TPC-H databases with Redpanda+Garage
+# Setup TPC-H databases with Tansu+Garage
 # Each TPC-H table gets its own database with dedicated log and storage
 
 HOST=${1:-xtdb}
