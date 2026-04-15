@@ -1,0 +1,1 @@
+adbc-drivers-validation @ git+https://github.com/adbc-drivers/validation.git

@@ -19,3 +19,13 @@ run = "source venv/bin/activate && python main.py"
 description = "Run Python tests"
 depends = ["deps"]
 run = "source venv/bin/activate && pytest -v tests/"
+
+[tasks."test:validation"]
+description = "Run adbc-drivers/validation conformance suite against XTDB"
+depends = ["deps"]
+run = """
+source venv/bin/activate \
+  && pip install -q -r requirements-validation.txt \
+  && XTDB_FLIGHT_SQL_URI=${XTDB_FLIGHT_SQL_URI:-grpc://${XTDB_HOST:-xtdb}:9833} \
+     pytest validation/tests/ -q --tb=no
+"""

@@ -1,0 +1,17 @@
+// Copyright (c) 2026 XTDB contributors
+// SPDX-License-Identifier: Apache-2.0
+//
+// XTDB override of the base int32 select test. XTDB diverges from standard
+// SQL here in two ways:
+//   * It has no `CREATE TABLE` statement — tables are created implicitly by
+//     the first INSERT. The override drops that DDL from the setup.
+//   * Every row requires an `_id` column. The override reuses `idx` as `_id`.
+
+// part: setup_query
+
+INSERT INTO test_int32 RECORDS
+  {_id: 1, idx: 1, res: 131072},
+  {_id: 2, idx: 2, res: 2147483647},
+  {_id: 3, idx: 3, res: -2147483648},
+  {_id: 4, idx: 4, res: 0},
+  {_id: 5, idx: 5, res: NULL}

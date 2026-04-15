@@ -4,8 +4,13 @@ XTDB Flight SQL Example
 Demonstrates connecting to XTDB via Arrow Flight SQL protocol using ADBC,
 including DML operations (INSERT, UPDATE, DELETE, ERASE).
 
-Note: DML operations require parameterized queries via executemany().
-Literal SQL values in DML statements are not yet supported.
+Two shapes of DML:
+  - Parameterized: cursor.executemany(sql, rows) — goes through FlightSQL
+    DoPut (update path).
+  - Literal: cursor.executescript(sql) — explicit update path. cursor.execute()
+    uses DoGet (query path) and fails for DML in FlightSQL; Python DB-API
+    doesn't distinguish query vs update so ADBC exposes executescript() for
+    this case. See xtdb/xtdb#5082.
 
 Requirements:
     pip install adbc-driver-flightsql pyarrow pandas
@@ -45,15 +50,8 @@ def main():
             )
             print(cursor.fetch_arrow_table().to_pandas())
 
-            # DML: INSERT (using executemany with parameters)
-            # Note: Literal SQL values don't work yet, use parameterized queries instead
-            #cursor.execute(
-            #    "INSERT INTO products (_id, name, price, category) VALUES "
-            #    "(1, 'Widget', 19.99, 'gadgets'), "
-            #    "(2, 'Gizmo', 29.99, 'gadgets'), "
-            #    "(3, 'Thingamajig', 9.99, 'misc')"
-            #)
-            print("\n4. DML - INSERT:")
+            # DML: INSERT via executemany (parameterized, DoPut path)
+            print("\n4a. DML - INSERT via executemany (parameterized):")
             cursor.executemany(
                 "INSERT INTO products (_id, name, price, category) VALUES (?, ?, ?, ?)",
                 [
@@ -63,6 +61,15 @@ def main():
                 ],
             )
             print("   Inserted 3 rows into 'products'")
+
+            # DML: INSERT via executescript (literal values, also DoPut path).
+            # cursor.execute() of the same SQL would route to DoGet and fail.
+            print("\n4b. DML - INSERT via executescript (literal RECORDS):")
+            cursor.executescript(
+                "INSERT INTO products RECORDS "
+                "{_id: 4, name: 'Whatsit', price: 4.99, category: 'misc'}"
+            )
+            print("   Inserted 1 row using RECORDS literal")
 
 
             print("\n5. Query inserted data:")
@@ -115,7 +122,9 @@ def main():
 
             # Cleanup
             print("\n13. Cleanup - ERASE remaining data:")
-            cursor.executemany("ERASE FROM products WHERE _id = ?", [(1,), (3,)])
+            cursor.executemany(
+                "ERASE FROM products WHERE _id = ?", [(1,), (3,), (4,)]
+            )
             print("   Erased remaining products")
 
             print("\n✓ Flight SQL DML examples completed successfully")
